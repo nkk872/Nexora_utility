@@ -1,26 +1,20 @@
-# Nexora Utility build status
+# Nexora Utility — implementation and verification status
 
-The Android CI workflow is now configured to use JDK 17, Gradle 8.9, Android lint, unit tests, and a debug APK artifact.
+## Completed in GitHub
+- Free-for-everyone access policy: docs/ACCESS_POLICY.md.
+- Android CI workflow: .github/workflows/android-ci.yml.
+- CI configured for JDK 17, Android SDK 35, Gradle 8.9, Kotlin compilation, Android lint, unit tests, debug APK, release APK, and artifact upload.
+- CI checks required native project files before compilation.
 
-## Source import status
+## Pending source integration
+The full source candidate is currently a ZIP in the working session. The repository must contain extracted project files at its root, including settings.gradle.kts, build.gradle.kts, gradle/libs.versions.toml, app/build.gradle.kts, and app/src/main/**. The workflow deliberately fails early if these are missing.
 
-The full Android Kotlin/Jetpack Compose project is prepared in the build-candidate archive supplied separately. It has **not yet been imported into this GitHub repository**. The repository currently contains setup documentation and selected bootstrap files, so CI cannot produce an APK until the Android project files are added.
+## Pending verification
+- Import/reconcile the complete source tree with existing GitHub commits.
+- Run CI and fix compiler, dependency, lint, and test failures.
+- Test permission denial/revocation, scoped media access, vault encryption/recovery, app-lock consent/disable, and destructive-action confirmation on devices.
+- Verify VPN tunnel establishment and routed traffic using a real provider configuration; otherwise keep VPN unavailable/disconnected.
+- Verify release signing, APK installation/upgrade, and Play disclosures.
 
-## Safety fixes in the candidate source
-
-- Removed the placeholder WireGuard private keys.
-- Disabled the misleading VPN "connected/secured" behavior. A TUN interface without a packet-forwarding engine is not a functioning VPN.
-- Removed broad all-files storage access from the manifest; the app should use scoped media access and the Storage Access Framework.
-- Removed the nonexistent round launcher icon resource reference.
-- Preserved the user-controlled app-lock accessibility/overlay flow with explicit Android settings consent.
-
-## Next release gates
-
-1. Import the candidate Android project into this repository.
-2. Run the Android CI workflow and fix all compiler/lint/test failures.
-3. Install the debug APK on a real Android device and verify permission-denied paths.
-4. Complete security review of vault encryption, app-lock persistence, and storage cleanup.
-5. Implement and independently verify a real VPN provider/packet-forwarding integration before advertising VPN protection.
-6. Only then prepare a signed release APK/AAB.
-
-A successful source archive export is not a compiled APK. Production readiness is not claimed until CI and device tests pass.
+## Truthful status
+No successful Android compilation or installable APK is claimed until a GitHub Actions run succeeds and a device smoke test is recorded. An artifact built without signing secrets is unsigned and not ready for Play Store distribution.
