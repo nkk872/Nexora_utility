@@ -1,11 +1,13 @@
 # Nexora Utility — implementation and verification status
 
 ## Repository audit (2026-11-08)
-The latest main commit is `bbd5a2a8bbf4517a4331845e3d640d0dcde78420`.
+Latest main commit before this status update: `bbd5a2a8bbf4517a4331845e3d640d0dcde78420`.
 
-The latest Android CI run failed at **Verify native Android project is present**. GitHub Actions confirmed that the required project files are missing, so all Android SDK setup, Kotlin compilation, lint, tests, and APK packaging steps were skipped.
+Latest Android CI run `42462401755` failed at **Verify native Android project is present**. GitHub Actions confirmed that the required project files are missing, so SDK setup, Kotlin compilation, lint, tests, and APK packaging were skipped.
 
-The current GitHub tree contains only:
+The saved `Nexora-Utility-build-candidate.zip` archive has now been recovered from the user's Library and inspected. It contains 75 files, including 39 Kotlin source files and the Gradle Android project. It does not include a Gradle wrapper. The archive is available, but its contents have not yet been committed to GitHub.
+
+The current GitHub tree still contains only:
 - `.github/workflows/android-ci.yml`
 - `BUILD_STATUS.md`
 - `README.md`
@@ -15,31 +17,27 @@ The current GitHub tree contains only:
 - `docs/FREE_ACCESS_AND_RELEASE_PLAN.md`
 - `docs/IMPLEMENTATION_STATUS.md`
 
-It does **not** yet contain the native Kotlin source tree, Gradle project files, version catalog, or Gradle wrapper. The manifest and launcher icon alone are not a buildable Android app.
+## Completed
+- Recovered and inspected the complete source candidate from the saved Library.
+- Confirmed the Android module contains 39 Kotlin source files and Gradle configuration.
+- Added free-for-everyone access/privacy documentation and CI workflow.
+- Added a source audit at `docs/SOURCE_AUDIT_2026-11-08.md`.
 
-## Completed in GitHub
-- Free-for-everyone access and privacy policy documentation.
-- Android CI workflow configured for JDK 17, Android SDK 35, Gradle 8.9, Kotlin compilation, lint, unit tests, debug APK, release APK, and artifact upload.
-- CI fails early when required native source/project files are absent rather than reporting a misleading successful build.
+## Blocking item — source import into GitHub
+The native project has not been imported into the repository. Do not replace it with a blank scaffold or treat the React preview as the Android app. Import the extracted project files at repository root while preserving the existing `.github/workflows` and `docs` policies. Required files include `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml`, `app/build.gradle.kts`, and `app/src/main/java/com/nexora/utility/**`.
 
-## Blocking item — native source import
-The full Kotlin/Compose source archive referenced in earlier work is not present in the current working session, and it has not been committed to this repository. Do not replace it with a blank scaffold or pretend the React preview is the Android app. Reattach the previously prepared `Nexora-Utility-build-candidate.zip` (or the latest complete Android source ZIP) so it can be inspected, reconciled, and imported.
+## Static audit findings
+- Cleaner measures real partition usage but scans only Nexora's own cache directories; it cannot clear other apps' private caches.
+- VPN fails closed, but the source contains two competing service paths and a separate WireGuard manager. Consolidate these; never ship a template private key or claim protection without a real handshake and routed traffic.
+- App Lock uses in-memory PIN hash/salt and package state, and starts with several packages preselected. Persistence and explicit user selection are required.
+- Vault uses AES-GCM and Android Keystore, but original filename/MIME metadata is not persisted in the vault listing.
+- Duplicate-photo deletion must remain opt-in with per-item review and confirmation.
+- Manifest permissions and Play disclosures still need policy review.
 
-Expected project files include:
-- `settings.gradle.kts`, `build.gradle.kts`
-- `gradle/libs.versions.toml` and Gradle wrapper files
-- `app/build.gradle.kts`
-- `app/src/main/AndroidManifest.xml`
-- `app/src/main/java/com/nexora/utility/**`
-- resources, tests, and required service configuration
+Detailed findings and sequence: `docs/SOURCE_AUDIT_2026-11-08.md`.
 
-## Verification still required after import
-- Reconcile source with the existing manifest, launcher, free-access policy, and CI workflow.
-- Run Kotlin compilation, Android lint, unit tests, and debug/release APK assembly; fix all failures.
-- Audit permissions and Play policy, especially broad storage and overlay permissions.
-- Test permission denial/revocation, scoped media access, encrypted vault and recovery, app-lock consent/disable, and destructive-action confirmation.
-- Verify VPN tunnel establishment and routed traffic with a real provider configuration; otherwise keep VPN unavailable/disconnected.
-- Verify release signing, installation/upgrade, and device smoke tests across supported Android versions.
+## Verification still required
+After import, run Kotlin compilation, Android lint, unit tests, debug/release APK assembly, then fix every real build failure. Test permission denial/revocation, scoped media access, encrypted vault/recovery, App Lock consent/disable, destructive-action confirmation, release signing, installation/upgrade, and physical-device behavior.
 
 ## Truthful status
-No successful Android compilation, tested installation, or installable APK is claimed. An unsigned release APK is not ready for Play Store distribution. The app remains intended to be free for everyone, with no premium tier, subscription, or paid unlocks.
+No successful Android compilation, tested installation, or installable APK is claimed. The app remains intended to be free for everyone, with no premium tier, subscription, or paid unlocks.
