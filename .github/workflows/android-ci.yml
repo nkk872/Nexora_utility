@@ -3,8 +3,24 @@ name: Android build, lint and tests
 on:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/android-ci.yml'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'app/**'
   pull_request:
     branches: [main]
+    paths:
+      - '.github/workflows/android-ci.yml'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'app/**'
   workflow_dispatch:
 
 permissions:
