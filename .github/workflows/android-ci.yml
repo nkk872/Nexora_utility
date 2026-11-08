@@ -22,6 +22,7 @@ on:
       - 'gradlew'
       - 'gradlew.bat'
       - 'app/**'
+      - 'nexora-android-source.zip'
   workflow_dispatch:
 
 permissions:
