@@ -11,6 +11,7 @@ on:
       - 'gradlew'
       - 'gradlew.bat'
       - 'app/**'
+      - 'nexora-android-source.zip'
   pull_request:
     branches: [main]
     paths:
@@ -38,6 +39,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Restore native Android source archive (if present)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f nexora-android-source.zip ]; then
+            unzip -oq nexora-android-source.zip -d .
+          fi
 
       - name: Verify native Android project is present
         shell: bash
