@@ -1,43 +1,37 @@
 # Nexora Utility — implementation and verification status
 
-## Repository audit (2026-11-08)
-Latest main commit before this status update: `bbd5a2a8bbf4517a4331845e3d640d0dcde78420`.
+Last checked: 2026-11-08.
 
-Latest Android CI run `42462401755` failed at **Verify native Android project is present**. GitHub Actions confirmed that the required project files are missing, so SDK setup, Kotlin compilation, lint, tests, and APK packaging were skipped.
+## Verified repository and CI state
+- Latest inspected main commit before this documentation update: `802407381bbf12a51d5664077b25852671e5de3e`.
+- Latest Android CI run inspected: run 11, ID `42462859689`, conclusion `failure`.
+- The job failed at `Verify native Android project is present`. JDK setup, Android SDK setup, Gradle, Kotlin compilation, lint, tests and APK assembly were all skipped.
+- The repository does not contain the Gradle project files or Kotlin source tree yet.
+- The native source archive is available in the working environment: 77 ZIP entries, 39 Kotlin files, about 415 KB uncompressed source. It must be added to the repository root as `nexora-android-source.zip`, or the extracted source tree committed directly.
 
-The saved `Nexora-Utility-build-candidate.zip` archive has now been recovered from the user's Library and inspected. It contains 75 files, including 39 Kotlin source files and the Gradle Android project. It does not include a Gradle wrapper. The archive is available, but its contents have not yet been committed to GitHub.
+## Work completed
+- Existing CI workflow checks for the real native project and runs compile, lint, tests, debug/release APK assembly after import.
+- Free-access and privacy policy documentation added.
+- Source-level release blockers documented in `docs/RELEASE_BLOCKERS.md`.
+- Existing source candidate inspected; it is a Kotlin/Jetpack Compose Android project, not merely the React preview.
 
-The current GitHub tree still contains only:
-- `.github/workflows/android-ci.yml`
-- `BUILD_STATUS.md`
-- `README.md`
-- `app/src/main/AndroidManifest.xml`
-- `app/src/main/res/drawable/ic_nexora_launcher.xml`
-- `docs/ACCESS_POLICY.md`
-- `docs/FREE_ACCESS_AND_RELEASE_PLAN.md`
-- `docs/IMPLEMENTATION_STATUS.md`
+## Source-level blockers
+- **VPN:** no verified provider-issued profile or real tunnel yet. The main service correctly refuses connection while unconfigured. Do not advertise VPN as working until a real handshake and routed traffic are verified.
+- **App Lock:** PIN salt/hash and protected package list are held in static in-memory values; they do not persist across process death/reboot. Replace hard-coded initial package selection with explicit user choices and secure persistence.
+- **Vault:** AES-GCM and Android Keystore are used for payloads, but original filename/MIME metadata is reconstructed generically when listing items. Add durable authenticated metadata and test recovery/key-loss behavior.
+- **Cleaner:** only clean files the app is allowed to access; Android does not permit silently clearing other apps' private caches.
+- **Permissions/Play policy:** review broad storage/overlay/usage access permissions and request only what each user-activated feature genuinely needs.
 
-## Completed
-- Recovered and inspected the complete source candidate from the saved Library.
-- Confirmed the Android module contains 39 Kotlin source files and Gradle configuration.
-- Added free-for-everyone access/privacy documentation and CI workflow.
-- Added a source audit at `docs/SOURCE_AUDIT_2026-11-08.md`.
+## Required verification
+1. Import the native project into `main`.
+2. Run `:app:compileDebugKotlin`, `:app:lintDebug`, `:app:testDebugUnitTest`, `:app:assembleDebug`, and `:app:assembleRelease`.
+3. Resolve build, lint and test failures.
+4. Complete App Lock and Vault persistence/security work; keep VPN unavailable until real configuration and end-to-end verification.
+5. Test permission denial/revocation, destructive-action confirmation, install/upgrade, and Android 8+ plus current Android versions on physical devices.
+6. Sign release builds only with a user-controlled signing key. Never commit keystore files or passwords.
 
-## Blocking item — source import into GitHub
-The native project has not yet been imported into the repository. A one-file import path is now prepared: upload `nexora-android-source.zip` to the repository root. The CI workflow extracts it before checking the Gradle/Kotlin project files. The archive excludes `.github/` and `docs/`, preserving the existing CI and policy documentation. Do not replace it with a blank scaffold or treat the React preview as the Android app. Required files include `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml`, `app/build.gradle.kts`, and `app/src/main/java/com/nexora/utility/**`.
+## Product promise
+Nexora Utility remains free for everyone: no premium tier, subscription, or paid unlock. Never fabricate scan totals, cleanup savings, device-performance improvements, or VPN connectivity.
 
-## Static audit findings
-- Cleaner measures real partition usage but scans only Nexora's own cache directories; it cannot clear other apps' private caches.
-- VPN fails closed, but the source contains two competing service paths and a separate WireGuard manager. Consolidate these; never ship a template private key or claim protection without a real handshake and routed traffic.
-- App Lock uses in-memory PIN hash/salt and package state, and starts with several packages preselected. Persistence and explicit user selection are required.
-- Vault uses AES-GCM and Android Keystore, but original filename/MIME metadata is not persisted in the vault listing.
-- Duplicate-photo deletion must remain opt-in with per-item review and confirmation.
-- Manifest permissions and Play disclosures still need policy review.
-
-Detailed findings and sequence: `docs/SOURCE_AUDIT_2026-11-08.md`.
-
-## Verification still required
-After import, run Kotlin compilation, Android lint, unit tests, debug/release APK assembly, then fix every real build failure. Test permission denial/revocation, scoped media access, encrypted vault/recovery, App Lock consent/disable, destructive-action confirmation, release signing, installation/upgrade, and physical-device behavior.
-
-## Truthful status
-No successful Android compilation, tested installation, or installable APK is claimed. The app remains intended to be free for everyone, with no premium tier, subscription, or paid unlocks.
+## Release status
+**Not release-ready.** No successful Android compilation, passing test suite, installable APK, or physical-device QA is verified yet.
