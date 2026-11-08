@@ -24,7 +24,7 @@ The current GitHub tree still contains only:
 - Added a source audit at `docs/SOURCE_AUDIT_2026-11-08.md`.
 
 ## Blocking item — source import into GitHub
-The native project has not been imported into the repository. Do not replace it with a blank scaffold or treat the React preview as the Android app. Import the extracted project files at repository root while preserving the existing `.github/workflows` and `docs` policies. Required files include `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml`, `app/build.gradle.kts`, and `app/src/main/java/com/nexora/utility/**`.
+The native project has not yet been imported into the repository. A one-file import path is now prepared: upload `nexora-android-source.zip` to the repository root. The CI workflow extracts it before checking the Gradle/Kotlin project files. The archive excludes `.github/` and `docs/`, preserving the existing CI and policy documentation. Do not replace it with a blank scaffold or treat the React preview as the Android app. Required files include `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml`, `app/build.gradle.kts`, and `app/src/main/java/com/nexora/utility/**`.
 
 ## Static audit findings
 - Cleaner measures real partition usage but scans only Nexora's own cache directories; it cannot clear other apps' private caches.
