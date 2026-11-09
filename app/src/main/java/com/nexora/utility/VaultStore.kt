@@ -123,6 +123,16 @@ class VaultStore(private val context: Context) {
         return deleted
     }
 
+    fun rename(id: String, newName: String): Boolean {
+        require(id.matches(Regex("[a-f0-9-]{36}"))) { "Invalid vault item" }
+        val safeName = newName.trim().take(160)
+        require(safeName.isNotBlank()) { "Name cannot be empty" }
+        if (!File(directory, id + ".nexora").isFile) return false
+        val old = readMetadata(id)
+        writeMetadata(id, safeName, old.second)
+        return true
+    }
+
     private fun writeMetadata(id: String, name: String, mime: String?) {
         val cipher = Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.ENCRYPT_MODE, getOrCreateKey()) }
         DataOutputStream(FileOutputStream(File(directory, "$id.meta"))).use { output ->
