@@ -114,6 +114,8 @@ jobs:
           NEXORA_KEYSTORE_PASSWORD: ${{ secrets.NEXORA_KEYSTORE_PASSWORD }}
           NEXORA_KEY_ALIAS: ${{ secrets.NEXORA_KEY_ALIAS }}
           NEXORA_KEY_PASSWORD: ${{ secrets.NEXORA_KEY_PASSWORD }}
+          NEXORA_ADMOB_APP_ID: ${{ secrets.NEXORA_ADMOB_APP_ID }}
+          NEXORA_ADMOB_BANNER_ID: ${{ secrets.NEXORA_ADMOB_BANNER_ID }}
         run: ./gradlew --no-daemon --stacktrace :app:assembleRelease
 
       - name: Build release Android App Bundle (signed when owner secrets are configured)
@@ -121,6 +123,8 @@ jobs:
           NEXORA_KEYSTORE_PASSWORD: ${{ secrets.NEXORA_KEYSTORE_PASSWORD }}
           NEXORA_KEY_ALIAS: ${{ secrets.NEXORA_KEY_ALIAS }}
           NEXORA_KEY_PASSWORD: ${{ secrets.NEXORA_KEY_PASSWORD }}
+          NEXORA_ADMOB_APP_ID: ${{ secrets.NEXORA_ADMOB_APP_ID }}
+          NEXORA_ADMOB_BANNER_ID: ${{ secrets.NEXORA_ADMOB_BANNER_ID }}
         run: ./gradlew --no-daemon --stacktrace :app:bundleRelease
 
       - name: Upload APK outputs
