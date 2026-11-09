@@ -20,7 +20,7 @@ WireGuard connections use the server and peer configured in the profile you prov
 
 ## Advertising, analytics and accounts
 
-The current repository build does not include a live AdMob advertising integration, analytics SDK, account registration or in-app tracking service. No production advertising identifiers are configured. If advertising or analytics is added in a future version, this policy and the app's consent flow will be updated before those services are enabled. The approved product plan allows only one anchored adaptive banner at the bottom of the app; it does not authorize other ad formats.
+The app includes the Google Mobile Ads SDK and Google's User Messaging Platform (UMP) consent SDK in test mode. It currently uses Google's public sample App ID and test banner unit ID only; no production AdMob account identifiers or revenue-generating ad units are configured. UMP consent information is requested at app launch, and the ad SDK is initialized only when UMP indicates that ad requests are permitted. The app displays at most one anchored adaptive test banner below navigation, and hides it on the Private Vault screen. Google may process device and ad-request information as described in Google's [Mobile Ads data disclosure](https://developers.google.com/admob/android/privacy/play-data-disclosure) and [privacy policy](https://policies.google.com/privacy). The owner must configure privacy messages, replace sample IDs with real identifiers and update Play Data safety disclosures before production ads are enabled. The approved product plan allows only one anchored adaptive banner; it does not authorize other ad formats.
 
 ## Storage, security and retention
 
