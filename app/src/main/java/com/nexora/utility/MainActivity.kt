@@ -181,10 +181,6 @@ private fun HomePage(cacheSize: Long, notice: String, open: (Page) -> Unit) {
 }
 
 @Composable
-private fun CleanerPage(cacheSize: Long, notice: String, refresh: () -> Unit, clean: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("SAFE CLEANUP", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.@Composable
 private fun CleanerPage(activity: Activity, cacheSize: Long, notice: String, refresh: (Long) -> Unit, clean: (Long) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
