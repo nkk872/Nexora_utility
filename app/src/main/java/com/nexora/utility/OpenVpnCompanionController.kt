@@ -33,11 +33,25 @@ class OpenVpnCompanionController(
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            service = IOpenVPNAPIService.Stub.asInterface(binder)
+            val connectedService = binder?.let(IOpenVPNAPIService.Stub::asInterface)
+            if (connectedService == null) {
+                service = null
+                bound = false
+                onStatus("API_ERROR", "OpenVPN service returned an invalid connection.", "ERROR")
+                return
+            }
+            service = connectedService
             bound = true
-            runCatching { service?.registerStatusCallback(statusCallback) }
-                .onFailure { onStatus("API_ERROR", it.message ?: "Could not register VPN status callback", "ERROR") }
-            onStatus("READY", "OpenVPN engine is available.", "INFO")
+            val registration = runCatching {
+                connectedService.registerStatusCallback(statusCallback)
+            }
+            registration.onSuccess {
+                onStatus("READY", "OpenVPN engine is available; waiting for tunnel state.", "INFO")
+            }.onFailure {
+                service = null
+                bound = false
+                onStatus("API_ERROR", it.message ?: "Could not register VPN status callback.", "ERROR")
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -58,7 +72,12 @@ class OpenVpnCompanionController(
         requireNotNull(service) { "OpenVPN engine is not connected." }.prepare(context.packageName)
 
     fun start(config: String) {
-        require(config.contains("client")) { "The selected OpenVPN profile is invalid." }
+        require(config.length in 1..(1024 * 1024)) { "The OpenVPN profile is empty or too large." }
+        require(config.contains(Regex("(?m)^\\s*client\\s*$")) &&
+            config.contains(Regex("(?m)^\\s*remote\\s+\\S+\\s+\\d+"))) {
+            "The selected OpenVPN client profile is invalid."
+        }
+        require(!config.contains("\u0000")) { "The OpenVPN profile contains invalid data." }
         requireNotNull(service) { "OpenVPN engine is not connected." }.startVPN(config)
     }
 
