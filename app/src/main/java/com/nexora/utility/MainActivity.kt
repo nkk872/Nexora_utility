@@ -39,9 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 private val Background = Color(0xFF080D0B)
 private val SurfaceDark = Color(0xFF121B17)
