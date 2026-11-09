@@ -496,13 +496,13 @@ private fun VaultPage(activity: Activity) {
         items(entries, key = { it.id }) { entry ->
             Row(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(14.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Encrypted file", fontWeight = FontWeight.SemiBold)
-                    Text("${formatBytes(entry.encryptedBytes)} • ${entry.id.take(8)}", color = SecondaryText, fontSize = 11.sp)
+                    Text(entry.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                    Text("${formatBytes(entry.encryptedBytes)} • ${entry.mimeType ?: "File"}", color = SecondaryText, fontSize = 11.sp)
                 }
                 TextButton(onClick = {
                     exportingId = entry.id
                     documentPickerInProgress = true
-                    exportPicker.launch("nexora-export-${entry.id.take(8)}.bin")
+                    exportPicker.launch(entry.displayName.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(100))
                 }) { Text("Export") }
                 TextButton(onClick = {
                     if (store.delete(entry.id)) {
