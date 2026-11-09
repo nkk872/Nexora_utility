@@ -18,7 +18,7 @@ Last updated: 2026-11-09.
 - Encrypted vault files using AES-256-GCM and an Android Keystore non-exportable key. Import, export and delete actions are available; originals are left unchanged.
 - Vault screen now gates viewing and actions behind Android strong biometric or device screen-lock credential using AndroidX BiometricPrompt. This is an in-app vault gate, not a system-wide app lock. Physical-device authentication QA is still required.
 - Device diagnostics: manufacturer/model, Android version/API, available RAM, battery percentage and thermal status when supported.
-- Shortcuts to Android App info, network, display, battery and sound settings.
+- Shortcuts to Android App info/app management, manufacturer game settings when available, network, display, battery and sound settings.
 - Embedded WireGuard client for user-provided WireGuard profiles.
 - VPN Gate live volunteer relay directory; selected OpenVPN profiles are stored encrypted and can be handed to the separately installed OpenVPN for Android companion app through its documented remote AIDL API.
 - VPN Gate availability, speed, uptime and privacy are not guaranteed; Nexora does not operate its own VPN server fleet.
