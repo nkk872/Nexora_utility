@@ -1,33 +1,27 @@
 # Nexora Utility
 
-Native Android utility app planned with Kotlin and Jetpack Compose.
+Native Android utility app built with Kotlin and Jetpack Compose.
 
-## Product scope
-- Smart cleaner and storage analyzer
-- Large-file and duplicate-photo manager
-- Android-supported app manager and user-controlled app-lock tools
-- Encrypted private vault
-- WireGuard VPN client (only when a real provider profile and verified routing are configured)
-- Game tools and device diagnostics
-- Privacy, permissions, and settings
+## Current implementation
+- Dark black / emerald-green interface with Home, Clean, Storage and Tools sections.
+- Safe cache estimate and explicit clearing of Nexora Utility's own cache only.
+- Internal shared data-partition usage and available-space display using Android filesystem statistics.
+- Shortcuts to Android system settings for app, network, display, battery and sound controls.
+- Minimal manifest and least-privilege baseline; no broad storage, overlay, accessibility or package-visibility permissions are requested by this foundation.
+
+## Product scope and release gates
+Planned next modules: user-selected file analysis, duplicate/large-file review, encrypted private vault, optional app-lock capability subject to Android accessibility and Play policy, app manager using supported system intents, diagnostics, game tools, and VPN integration only with a real provider configuration and verified routing.
+
+Features are not described as active until implemented and tested. Android does not allow an ordinary third-party app to silently clear other apps' caches, hide arbitrary apps, or boost CPU/GPU performance. Nexora will use supported APIs and disclose these limitations.
 
 ## Monetization
-Nexora Utility is free to use and earns revenue through advertising only. The only permitted placement is one anchored adaptive banner at the bottom of the app. No subscriptions, premium tier, paid unlocks, credits, interstitials, rewarded videos, app-open ads, pop-ups, or full-screen ads. Features must remain usable when the banner fails to load.
+Free to use. The only permitted advertising placement is one anchored adaptive banner at the bottom. No subscriptions, premium tier, paid unlocks, credits, interstitials, rewarded ads, app-open ads, pop-ups or full-screen ads. Live ads remain disabled until real AdMob identifiers, consent, privacy disclosures and QA are complete. See [ad requirements](docs/ADS_AND_MONETIZATION_REQUIREMENTS.md).
 
-See [bottom-banner advertising requirements](docs/ADS_AND_MONETIZATION_REQUIREMENTS.md).
-
-## Engineering principles
-- Never fabricate scan sizes, battery health, RAM savings, device-performance improvements, or VPN status.
-- Never delete user files without explicit review and confirmation.
-- Use Android-supported APIs and explain limitations of app hiding, background cleaning, and performance controls.
-- Keep vault content out of device backups; protect secrets with Android Keystore-backed encryption.
-- Request sensitive permissions only when the user activates the feature, with clear disclosure.
-- Use Google's test ad unit during development; add UMP consent and accurate privacy disclosures before enabling live ads.
-
-## Build status
-The repository does not yet contain the complete Kotlin/Gradle project. The latest GitHub Actions run failed at the native project presence check and did not compile Kotlin or build an APK. An Android Gradle build and real-device QA have not been verified. See [BUILD_STATUS.md](BUILD_STATUS.md) for current evidence and release gates.
-
-## Project identity
+## Build
 - Application ID: `com.nexora.utility`
-- Main branch: `main`
-- Planned implementation: `app/` (Kotlin + Jetpack Compose)
+- Minimum Android: API 26
+- Compile / target SDK: 35
+- JDK: 17
+- Gradle: 8.9 (CI generates the wrapper if absent)
+
+The GitHub Actions workflow compiles Kotlin, runs lint and tests, and assembles a debug APK. A successful CI run and physical-device QA are required before calling this release-ready.
