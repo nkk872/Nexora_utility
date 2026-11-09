@@ -185,7 +185,7 @@ private fun StoragePage(activity: Activity) {
                 selected = emptySet()
                 duplicateGroups = emptyList()
                 folderLabel = root?.name ?: "Selected folder"
-                scanMessage = "Reviewed $visited entries. Found " + files.size + " photos, videos and large files (up to 500 shown)."
+                scanMessage = "Reviewed $visited entries. Found " + found.size + " photos, videos and large files (up to 500 shown)."
             }.onFailure { scanMessage = "Could not read this folder. Please choose it again." }
         }
     }
