@@ -16,6 +16,7 @@ Last updated: 2026-11-09.
 - Exact SHA-256 duplicate grouping for the large files currently displayed by the folder scan. This is a bounded review, not a full-device media scan; no automatic deletion.
 - Encrypted vault screen using AES-256-GCM and a non-exportable Android Keystore key. User can import a file into encrypted app-private storage, export a decrypted copy to a chosen destination, and delete the encrypted vault copy. Original source files are left untouched.
 - Vault does not yet have a separate PIN/biometric gate. It must not be described as PIN/biometric protected.
+- Tools diagnostics: device manufacturer/model, Android version/API, available RAM, battery percentage and thermal status when supported.
 - Tools shortcuts to Android App info, network, display, battery and sound settings.
 
 ## Eight development stages
@@ -24,7 +25,7 @@ Last updated: 2026-11-09.
 3. Encrypted private vault — encrypted storage/import/export is implemented; separate PIN/biometric access gate and security QA remain.
 4. App lock — not implemented. System-wide locking of other apps is restricted and requires careful Android/Play policy review. Do not fake this.
 5. App manager / app hiding — only Android App info settings shortcut exists. Arbitrary app hiding is not supported for ordinary apps; supported app-management flow remains.
-6. Device diagnostics / game tools — basic system-settings shortcuts exist; actual diagnostics and honest game information remain.
+6. Device diagnostics / game tools — basic live diagnostics and system-settings shortcuts are implemented; game-specific tools remain.
 7. VPN — not implemented. Requires a selected provider, profile/credentials and Android VPN consent; connection must be verified by handshake and routed traffic before reporting connected.
 8. Ads, testing and release — no AdMob IDs or UMP consent integration configured; no successful build, lint, test, APK, AAB or device QA confirmed.
 
