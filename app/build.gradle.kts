@@ -51,6 +51,14 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildTypes {
         getByName("release") {
+            // Never ship Google test banners in release builds without production IDs.
+            manifestPlaceholders["ADMOB_APP_ID"] =
+                if (useProductionAds) ownerAdmobAppId!! else "ca-app-pub-3940256099942544~3347511713"
+            buildConfigField(
+                "String",
+                "ADMOB_BANNER_UNIT_ID",
+                "\"${if (useProductionAds) ownerBannerUnitId!! else ""}\""
+            )
             if (!releaseKeystorePath.isNullOrBlank() &&
                 !releaseStorePassword.isNullOrBlank() &&
                 !releaseKeyAlias.isNullOrBlank() &&
