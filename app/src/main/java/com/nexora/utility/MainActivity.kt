@@ -22,6 +22,7 @@ import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import com.wireguard.android.backend.Tunnel.State
 import com.wireguard.config.Config
+import java.io.File
 import java.io.FileInputStream
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -129,10 +130,11 @@ private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
                         refresh = { cacheSize = readCacheSize(activity); notice = "Cache estimate refreshed." },
                         clean = {
                             val before = readCacheSize(activity)
-                            activity.cacheDir.listFiles().orEmpty().forEach { it.deleteRecursively() }
+                            val cleanerCache = File(activity.cacheDir, "nexora_cleaner")
+                            cleanerCache.listFiles().orEmpty().forEach { it.deleteRecursively() }
                             cacheSize = readCacheSize(activity)
                             val freed = (before - cacheSize).coerceAtLeast(0)
-                            notice = "Removed " + formatBytes(freed) + " from this app's cache."
+                            notice = "Removed " + formatBytes(freed) + " of cleaner temporary files."
                         })
                     Page.STORAGE -> StoragePage(activity)
                     Page.VAULT -> VaultPage(activity)
@@ -1011,8 +1013,12 @@ private fun FeatureRow(title: String, description: String, glyph: String, onClic
     }
 }
 
-private fun readCacheSize(activity: Activity): Long =
-    activity.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+/** Only count files in Nexora's dedicated cleaner cache; vault previews/exports are excluded. */
+private fun readCacheSize(activity: Activity): Long {
+    val cleanerCache = File(activity.cacheDir, "nexora_cleaner")
+    if (!cleanerCache.exists()) return 0L
+    return cleanerCache.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+}
 
 private fun formatBytes(bytes: Long): String {
     if (bytes < 1024) return "$bytes B"
