@@ -142,6 +142,8 @@ private fun StoragePage(activity: Activity) {
     var folderLabel by remember { mutableStateOf("No folder selected") }
     var files by remember { mutableStateOf<List<ScannedFile>>(emptyList()) }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var duplicateGroups by remember { mutableStateOf<List<DuplicateScanner.DuplicateGroup>>(emptyList()) }
+    var duplicateMessage by remember { mutableStateOf("Duplicate scan checks exact file contents, not similar photos.") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var scanMessage by remember { mutableStateOf("Choose a folder to review large files. Nothing is deleted automatically.") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -165,6 +167,7 @@ private fun StoragePage(activity: Activity) {
                 if (root != null) walk(root)
                 files = found.sortedByDescending { it.size }.take(100)
                 selected = emptySet()
+                duplicateGroups = emptyList()
                 folderLabel = root?.name ?: "Selected folder"
                 scanMessage = "Reviewed $visited folder entries. Large-file matches are shown below."
             }.onFailure { scanMessage = "Could not read this folder. Please choose it again." }
@@ -216,7 +219,17 @@ private fun StoragePage(activity: Activity) {
             }
         }
         if (files.isNotEmpty()) {
-            item { Text("Large files (${files.size})", fontWeight = FontWeight.Bold) }
+            item {
+                Text("Large files (${files.size})", fontWeight = FontWeight.Bold)
+                Button(onClick = {
+                    duplicateGroups = DuplicateScanner.findDuplicates(
+                        activity.contentResolver,
+                        files.map { DuplicateScanner.Candidate(it.uri, it.name, it.size) }
+                    )
+                    duplicateMessage = "Checked ${files.size} listed large files. Exact matches are grouped below."
+                }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) { Text("Find exact duplicates in listed files") }
+                Text(duplicateMessage, color = SecondaryText, fontSize = 11.sp)
+            }
             items(files, key = { it.uri.toString() }) { file ->
                 Row(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(14.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = selected.contains(file.uri.toString()), onCheckedChange = { checked ->
@@ -225,6 +238,15 @@ private fun StoragePage(activity: Activity) {
                     Column(Modifier.weight(1f)) {
                         Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
                         Text(formatBytes(file.size), color = SecondaryText, fontSize = 12.sp)
+                    }
+                }
+            }
+            if (duplicateGroups.isNotEmpty()) {
+                item { Text("Exact duplicate groups (${duplicateGroups.size})", fontWeight = FontWeight.Bold) }
+                items(duplicateGroups, key = { it.sha256 }) { group ->
+                    Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(14.dp)).padding(12.dp)) {
+                        Text("${group.items.size} identical files", color = Accent, fontWeight = FontWeight.SemiBold)
+                        group.items.forEach { Text(it.displayName, color = SecondaryText, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     }
                 }
             }
