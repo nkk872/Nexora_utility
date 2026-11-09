@@ -344,7 +344,11 @@ private fun NexoraVpnPage(activity: Activity) {
     var servers by remember { mutableStateOf<List<VpnGateServer>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    var selected by remember { mutableStateOf<String?>(null) }
+    var selected by remember { mutableStateOf<VpnGateServer?>(null) }
+    val context = LocalContext.current
+    val vault = remember { VaultStore(context) }
+    val preferences = remember { context.getSharedPreferences("nexora_vpn", 0) }
+    var savedProfileId by remember { mutableStateOf(preferences.getString("vpngate_profile_id", null)) }
     var message by remember { mutableStateOf("Loading live volunteer VPN relays…") }
 
     val loadServers: () -> Unit = {
@@ -426,16 +430,36 @@ private fun NexoraVpnPage(activity: Activity) {
                     Text(server.countryShort, color = Accent, fontWeight = FontWeight.Bold)
                 }
                 Text("Ping ${server.pingMs} ms  •  ${server.speedMbps} Mbps  •  ${server.sessions} sessions", color = SecondaryText, fontSize = 12.sp)
-                Text(if (selected == server.hostName) "Selected" else "OpenVPN profile available", color = if (selected == server.hostName) Accent else SecondaryText, fontSize = 11.sp)
+                Text(if (selected?.hostName == server.hostName) "Selected" else "OpenVPN profile available", color = if (selected == server.hostName) Accent else SecondaryText, fontSize = 11.sp)
                 Button(
                     onClick = {
-                        selected = server.hostName
-                        message = "${server.countryLong} selected. OpenVPN profile is available; the in-app OpenVPN connection engine is the next integration step."
+                        selected = server
+                        message = "${server.countryLong} selected. You can securely save its OpenVPN profile on this device."
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (selected == server.hostName) Accent else Color(0xFF25352D), contentColor = if (selected == server.hostName) Background else Color.White)
-                ) { Text(if (selected == server.hostName) "Selected server" else "Select location") }
+                    colors = ButtonDefaults.buttonColors(containerColor = if (selected?.hostName == server.hostName) Accent else Color(0xFF25352D), contentColor = if (selected?.hostName == server.hostName) Background else Color.White)
+                ) { Text(if (selected?.hostName == server.hostName) "Selected server" else "Select location") }
+                if (selected?.hostName == server.hostName) {
+                    Button(
+                        onClick = {
+                            runCatching {
+                                val profile = VpnGateRepository.decodeOpenVpnProfile(server)
+                                val entry = vault.encryptBytes(profile.toByteArray(Charsets.UTF_8))
+                                preferences.edit().putString("vpngate_profile_id", entry.id).apply()
+                                savedProfileId = entry.id
+                                message = "OpenVPN profile encrypted and saved in Nexora Vault. Connection engine integration is still pending."
+                            }.onFailure {
+                                message = "Could not save this server profile securely."
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25352D), contentColor = Color.White)
+                    ) { Text("Save OpenVPN profile securely") }
+                }
             }
+        }
+        if (savedProfileId != null) {
+            item { Text("An OpenVPN profile is encrypted in Nexora Vault on this device. It is not connected yet.", color = Accent, fontSize = 12.sp) }
         }
         item {
             Text(
