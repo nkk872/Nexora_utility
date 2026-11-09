@@ -21,6 +21,13 @@ import com.wireguard.android.backend.Tunnel
 import com.wireguard.android.backend.Tunnel.State
 import com.wireguard.config.Config
 import java.io.FileInputStream
+import android.app.Activity.RESULT_OK
+import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+import com.wireguard.android.backend.GoBackend
+import com.wireguard.android.backend.Tunnel
+import com.wireguard.android.backend.Tunnel.State
+import com.wireguard.config.Config
+import java.io.FileInputStream
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -349,6 +356,7 @@ private fun NexoraVpnPage(activity: Activity) {
     val vault = remember { VaultStore(context) }
     val preferences = remember { context.getSharedPreferences("nexora_vpn", 0) }
     var savedProfileId by remember { mutableStateOf(preferences.getString("vpngate_profile_id", null)) }
+    var showWireGuard by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("Loading live volunteer VPN relays…") }
 
     val loadServers: () -> Unit = {
@@ -369,6 +377,11 @@ private fun NexoraVpnPage(activity: Activity) {
                 }
             }.start()
         }
+    }
+
+    if (showWireGuard) {
+        WireGuardProfilePage(activity, onBack = { showWireGuard = false })
+        return
     }
 
     LaunchedEffect(Unit) { loadServers() }
@@ -397,6 +410,7 @@ private fun NexoraVpnPage(activity: Activity) {
                 Text("Explore free VPN locations", fontSize = 23.sp, fontWeight = FontWeight.Bold)
                 Text("Live directory of volunteer-operated OpenVPN relays. Countries and servers appear only when the provider currently lists them.", color = SecondaryText, fontSize = 12.sp)
                 Text(message, color = SecondaryText, fontSize = 12.sp)
+                TextButton(onClick = { showWireGuard = true }) { Text("Use my WireGuard profile instead", color = Accent) }
                 Button(onClick = loadServers, enabled = !loading, modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
                     Text(if (loading) "Refreshing…" else "Refresh server list")
@@ -469,6 +483,111 @@ private fun NexoraVpnPage(activity: Activity) {
         }
     }
 }
+
+
+@Composable
+private fun WireGuardProfilePage(activity: Activity, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val vault = remember { VaultStore(context) }
+    val preferences = remember { context.getSharedPreferences("nexora_vpn", 0) }
+    var profileId by remember { mutableStateOf(preferences.getString("wireguard_profile_id", null)) }
+    var status by remember { mutableStateOf(WireGuardRuntime.state.name) }
+    var message by remember { mutableStateOf("Import a WireGuard .conf profile for a WireGuard-compatible server.") }
+    var busy by remember { mutableStateOf(false) }
+    val importPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                val entry = vault.encrypt(uri)
+                preferences.edit().putString("wireguard_profile_id", entry.id).apply()
+                profileId = entry.id
+                message = "WireGuard profile encrypted and saved on this device."
+            }.onFailure { message = "Could not securely import this profile." }
+        }
+    }
+    val connectNow: () -> Unit = {
+        val id = profileId
+        if (id == null) {
+            message = "Import a WireGuard profile first."
+        } else {
+            busy = true
+            Thread {
+                val result = runCatching {
+                    val temp = vault.decryptToCache(id)
+                    try {
+                        val config = FileInputStream(temp).use { Config.parse(it) }
+                        WireGuardRuntime.connect(context, config)
+                    } finally { temp.delete() }
+                }
+                activity.runOnUiThread {
+                    busy = false
+                    status = WireGuardRuntime.state.name
+                    message = result.fold(
+                        { "WireGuard engine started; confirm a peer handshake before relying on the tunnel." },
+                        { "Connection failed: " + (it.message ?: "Check the profile and endpoint.") }
+                    )
+                }
+            }.start()
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) connectNow()
+        else message = "Android VPN permission was not granted."
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        TextButton(onClick = onBack) { Text("← Back to free server list", color = Accent) }
+        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(20.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("WIREGUARD PROFILE", color = Accent, fontWeight = FontWeight.Bold)
+            Text("Connect using your own server", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("This keeps the existing embedded WireGuard client available. It is separate from VPN Gate's OpenVPN servers.", color = SecondaryText, fontSize = 12.sp)
+            Text("Engine state: $status", color = SecondaryText)
+            Button(onClick = { importPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (profileId == null) "Import WireGuard .conf" else "Replace profile")
+            }
+            Button(onClick = {
+                val permission = VpnService.prepare(activity)
+                if (permission != null) permissionLauncher.launch(permission) else connectNow()
+            }, enabled = !busy && profileId != null && status != "UP", modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
+                Text(if (busy) "Connecting…" else "Connect WireGuard")
+            }
+            Button(onClick = {
+                busy = true
+                Thread {
+                    val result = runCatching { WireGuardRuntime.disconnect() }
+                    activity.runOnUiThread {
+                        busy = false
+                        status = WireGuardRuntime.state.name
+                        message = if (result.isSuccess) "WireGuard tunnel stopped." else "Could not stop tunnel."
+                    }
+                }.start()
+            }, enabled = !busy && status == "UP", modifier = Modifier.fillMaxWidth()) { Text("Disconnect") }
+            Text(message, color = SecondaryText, fontSize = 12.sp)
+        }
+    }
+}
+
+private object WireGuardRuntime {
+    @Volatile var state: State = State.DOWN
+        private set
+    @Volatile private var backend: GoBackend? = null
+    private val tunnel = object : Tunnel {
+        override fun getName(): String = "Nexora"
+        override fun onStateChange(newState: State) { state = newState }
+    }
+    @Synchronized
+    fun connect(context: android.content.Context, config: Config) {
+        val engine = backend ?: GoBackend(context.applicationContext).also { backend = it }
+        engine.setState(tunnel, State.UP, config)
+        state = engine.getState(tunnel)
+    }
+    @Synchronized
+    fun disconnect() {
+        val engine = backend ?: return
+        engine.setState(tunnel, State.DOWN, null)
+        state = engine.getState(tunnel)
+    }
+}
+
 
 @Composable
 private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
