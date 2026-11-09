@@ -280,6 +280,9 @@ private fun StoragePage(activity: Activity) {
     var duplicateMessage by remember { mutableStateOf("Duplicate scan checks exact file contents, not similar photos.") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var scanMessage by remember { mutableStateOf("Choose a folder to review photos, videos and large files. Nothing is deleted automatically.") }
+    var scanInProgress by remember { mutableStateOf(false) }
+    var scanProgress by remember { mutableStateOf(0) }
+    var scanCancellation by remember { mutableStateOf<java.util.concurrent.atomic.AtomicBoolean?>(null) }
     var fileFilter by remember { mutableStateOf("All") }
     val visibleFiles = remember(files, fileFilter) {
         files.filter { file ->
@@ -295,19 +298,28 @@ private fun StoragePage(activity: Activity) {
     val videoCount = files.count { it.mimeType?.startsWith("video/") == true }
     val largeCount = files.count { it.size >= 20L * 1024L * 1024L }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) {
+        if (uri != null && !scanInProgress) {
+            val cancelFlag = java.util.concurrent.atomic.AtomicBoolean(false)
+            scanCancellation = cancelFlag
+            scanInProgress = true
+            scanProgress = 0
             scanMessage = "Scanning selected folder in the background…"
             Thread {
+                var wasCancelled = false
                 val result = runCatching {
                     activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                     val root = DocumentFile.fromTreeUri(activity, uri)
                     val found = mutableListOf<ScannedFile>()
                     var visited = 0
                     fun walk(dir: DocumentFile) {
-                        if (visited >= 5000) return
+                        if (visited >= 5000 || cancelFlag.get()) return
                         for (item in dir.listFiles()) {
-                            if (visited >= 5000) break
+                            if (visited >= 5000 || cancelFlag.get()) break
                             visited++
+                            if (visited % 25 == 0) {
+                                val current = visited
+                                activity.runOnUiThread { if (scanCancellation === cancelFlag) scanProgress = (current * 100 / 5000).coerceIn(0, 99) }
+                            }
                             if (item.isDirectory) {
                                 walk(item)
                             } else if (item.isFile) {
@@ -321,15 +333,22 @@ private fun StoragePage(activity: Activity) {
                         }
                     }
                     if (root != null) walk(root)
+                    wasCancelled = cancelFlag.get()
                     Triple(root?.name ?: "Selected folder", visited, found.distinctBy { it.uri.toString() }.sortedByDescending { it.size }.take(500))
                 }
                 activity.runOnUiThread {
+                    if (scanCancellation === cancelFlag) {
+                        scanInProgress = false
+                        scanCancellation = null
+                        scanProgress = if (result.isSuccess) 100 else scanProgress
+                    }
                     result.onSuccess { (name, visited, matches) ->
                         files = matches
                         selected = emptySet()
                         duplicateGroups = emptyList()
                         folderLabel = name
-                        scanMessage = "Reviewed $visited entries. Found ${matches.size} photos, videos and large files (up to 500 shown)."
+                        scanMessage = if (wasCancelled) "Scan cancelled. Reviewed $visited entries and kept ${matches.size} results found so far."
+                            else "Reviewed $visited entries. Found ${matches.size} photos, videos and large files (up to 500 shown)."
                     }.onFailure {
                         scanMessage = "Could not read this folder. Please choose it again."
                     }
@@ -385,7 +404,14 @@ private fun StoragePage(activity: Activity) {
             Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(20.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Text("FIND SPACE-HOGGING FILES", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                 Text("Review photos, videos and files larger than 20 MB. You stay in control of every deletion.", color = SecondaryText, fontSize = 12.sp)
-                Button(onClick = { picker.launch(null) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background), contentPadding = PaddingValues(vertical = 12.dp)) { Text("Choose folder to scan") }
+                Button(onClick = { picker.launch(null) }, enabled = !scanInProgress, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background), contentPadding = PaddingValues(vertical = 12.dp)) { Text(if (scanInProgress) "Scanning…" else "Choose folder to scan") }
+                if (scanInProgress) {
+                    LinearProgressIndicator(progress = { scanProgress / 100f }, modifier = Modifier.fillMaxWidth().height(7.dp), color = Accent, trackColor = Color(0xFF29352F))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("$scanProgress% • Up to 5,000 entries", color = SecondaryText, fontSize = 11.sp)
+                        TextButton(onClick = { scanCancellation?.set(true) }) { Text("Cancel", color = Color(0xFFFF8888)) }
+                    }
+                }
                 Text(folderLabel, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 Text(scanMessage, color = SecondaryText, fontSize = 11.sp)
             }
