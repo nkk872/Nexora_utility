@@ -1,4 +1,4 @@
-name: Android build
+name: Android quality and build
 
 on:
   push:
@@ -10,9 +10,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  debug-build:
-    name: Verify Android debug build
+  verify:
+    name: Lint, test and build Android
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -35,13 +39,37 @@ jobs:
       - name: Install Android platform and build tools
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Run Android lint
+        run: gradle --no-daemon :app:lintDebug
+
+      - name: Run unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
+
       - name: Assemble debug APK
         run: gradle --no-daemon :app:assembleDebug
+
+      - name: Assemble release APK
+        env:
+          NEXORA_ADMOB_APP_ID: ${{ secrets.NEXORA_ADMOB_APP_ID }}
+          NEXORA_ADMOB_BANNER_ID: ${{ secrets.NEXORA_ADMOB_BANNER_ID }}
+          NEXORA_KEYSTORE_PATH: ${{ secrets.NEXORA_KEYSTORE_PATH }}
+          NEXORA_KEYSTORE_PASSWORD: ${{ secrets.NEXORA_KEYSTORE_PASSWORD }}
+          NEXORA_KEY_ALIAS: ${{ secrets.NEXORA_KEY_ALIAS }}
+          NEXORA_KEY_PASSWORD: ${{ secrets.NEXORA_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:assembleRelease
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: nexora-utility-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexora-utility-release-unsigned-or-signed
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
