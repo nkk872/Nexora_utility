@@ -452,6 +452,7 @@ private fun VaultPage(activity: Activity) {
                             androidx.core.content.ContextCompat.getMainExecutor(context),
                             object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
                                 override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
+                                    store.cleanupTemporaryFiles()
                                     unlocked = true
                                     entries = store.entries()
                                     message = "Vault unlocked."
@@ -537,7 +538,7 @@ private fun VaultPage(activity: Activity) {
                         Text("ENCRYPTED STORAGE", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
                         Text("Your files, encrypted.", fontSize = 23.sp, fontWeight = FontWeight.Bold)
                     }
-                    TextButton(onClick = { unlocked = false; message = "Vault locked." }) { Text("Lock", color = Accent) }
+                    TextButton(onClick = { unlocked = false; entries = emptyList(); previewBitmap = null; previewLoading = false; renamingEntry = null; message = "Vault locked." }) { Text("Lock", color = Accent) }
                 }
                 Text("AES-256-GCM encryption with a non-exportable Android Keystore key. Vault access also requires device authentication.", color = SecondaryText, fontSize = 12.sp)
                 Button(onClick = { documentPickerInProgress = true; importPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) { Text("Add file to vault") }
