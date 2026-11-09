@@ -34,7 +34,7 @@ private val Background = Color(0xFF080D0B)
 private val SurfaceDark = Color(0xFF121B17)
 private val Accent = Color(0xFF39D98A)
 private val SecondaryText = Color(0xFFA2B2A9)
-private enum class Page { HOME, CLEANER, STORAGE, TOOLS }
+private enum class Page { HOME, CLEANER, STORAGE, VAULT, TOOLS }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,10 +55,10 @@ private fun NexoraApp(activity: Activity) {
     )) {
         Scaffold(containerColor = Background, bottomBar = {
             NavigationBar(containerColor = SurfaceDark) {
-                listOf(Page.HOME to "Home", Page.CLEANER to "Clean", Page.STORAGE to "Storage", Page.TOOLS to "Tools").forEach { (target, label) ->
+                listOf(Page.HOME to "Home", Page.CLEANER to "Clean", Page.STORAGE to "Storage", Page.VAULT to "Vault", Page.TOOLS to "Tools").forEach { (target, label) ->
                     NavigationBarItem(
                         selected = page == target, onClick = { page = target },
-                        icon = { Text(when (target) { Page.HOME -> "⌂"; Page.CLEANER -> "✦"; Page.STORAGE -> "▤"; Page.TOOLS -> "⚙" }, fontSize = 20.sp) },
+                        icon = { Text(when (target) { Page.HOME -> "⌂"; Page.CLEANER -> "✦"; Page.STORAGE -> "▤"; Page.VAULT -> "▣"; Page.TOOLS -> "⚙" }, fontSize = 20.sp) },
                         label = { Text(label) },
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Accent, selectedTextColor = Accent, indicatorColor = Accent.copy(alpha = .12f), unselectedTextColor = SecondaryText)
                     )
@@ -69,7 +69,7 @@ private fun NexoraApp(activity: Activity) {
                 Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("NEXORA", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-                        Text(when (page) { Page.HOME -> "Utility"; Page.CLEANER -> "Smart cleaner"; Page.STORAGE -> "Storage"; Page.TOOLS -> "Device tools" }, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                        Text(when (page) { Page.HOME -> "Utility"; Page.CLEANER -> "Smart cleaner"; Page.STORAGE -> "Storage"; Page.VAULT -> "Private vault"; Page.TOOLS -> "Device tools" }, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                     }
                     Text("●", color = Accent, fontSize = 20.sp)
                 }
