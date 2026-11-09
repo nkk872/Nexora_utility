@@ -26,8 +26,14 @@ Last updated: 2026-11-09.
 4. App lock — not implemented. System-wide locking of other apps is restricted and requires careful Android/Play policy review. Do not fake this.
 5. App manager / app hiding — only Android App info settings shortcut exists. Arbitrary app hiding is not supported for ordinary apps; supported app-management flow remains.
 6. Device diagnostics / game tools — basic live diagnostics and system-settings shortcuts are implemented; game-specific tools remain.
-7. VPN — not implemented. Requires a selected provider, profile/credentials and Android VPN consent; connection must be verified by handshake and routed traffic before reporting connected.
+7. VPN — provider-neutral Android VPN setup screen implemented. It opens Android VPN settings and detects the active network's VPN transport using ACCESS_NETWORK_STATE. No provider is selected or bundled, no tunnel is implemented by Nexora, and provider identity/encryption/routing/leak safety are not verified. See docs/VPN_SETUP.md. Provider-specific integration and end-to-end VPN QA remain blocked until the owner selects a provider.
 8. Ads, testing and release — no AdMob IDs or UMP consent integration configured; no successful build, lint, test, APK, AAB or device QA confirmed.
+
+## VPN implementation details
+- Added a VPN destination to the existing Compose navigation.
+- Added Android native VPN settings launch and a refreshable active-network VPN transport indicator.
+- Added only ACCESS_NETWORK_STATE; no VPN service, profile import, credentials, private keys, or provider SDK are included.
+- The UI explicitly distinguishes transport detection from provider identity, tunnel security, DNS routing, and leak testing.
 
 ## Build verification
 - Existing `.github/workflows/android-ci.yml` runs on `main` pushes, pull requests, and manual dispatch. It installs JDK 17 / Android SDK 35, provisions Gradle 8.9, generates the wrapper when absent, compiles Kotlin, runs lint and unit tests, and assembles debug plus unsigned release APKs as workflow artifacts.
