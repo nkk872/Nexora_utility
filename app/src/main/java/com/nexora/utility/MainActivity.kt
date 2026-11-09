@@ -327,8 +327,8 @@ private fun VaultPage(activity: Activity) {
                 message = "Vault locked automatically when Nexora went into the background."
             }
         }
-        activity.lifecycle.addObserver(observer)
-        onDispose { activity.lifecycle.removeObserver(observer) }
+        fragmentActivity?.lifecycle?.addObserver(observer)
+        onDispose { fragmentActivity?.lifecycle?.removeObserver(observer) }
     }
     val authenticators = androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or
         androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
