@@ -775,6 +775,14 @@ private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
         FeatureRow("Display settings", "Brightness, screen timeout and display", "☼") { launchSetting(activity, Intent(Settings.ACTION_DISPLAY_SETTINGS), report) }
         FeatureRow("Battery settings", "Battery usage and power controls", "ϟ") { launchSetting(activity, Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS), report) }
         FeatureRow("Sound settings", "Volume and sound preferences", "♫") { launchSetting(activity, Intent(Settings.ACTION_SOUND_SETTINGS), report) }
+        val consentInfo = UserMessagingPlatform.getConsentInformation(activity)
+        if (consentInfo.privacyOptionsRequirementStatus == ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED) {
+            FeatureRow("Privacy choices", "Review or change advertising consent options", "◉") {
+                UserMessagingPlatform.showPrivacyOptionsForm(activity) { error ->
+                    report(if (error == null) "Privacy choices updated." else "Could not open privacy choices.")
+                }
+            }
+        }
         Text("Game settings are provided by your phone manufacturer when available; Nexora does not claim to boost FPS or CPU/GPU performance. Android restricts system-wide app locking and hiding for ordinary apps.", color = SecondaryText, fontSize = 12.sp)
     }
 }
