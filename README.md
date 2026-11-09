@@ -27,6 +27,6 @@ Free to use. The only permitted advertising placement is one anchored adaptive b
 - Minimum Android: API 26
 - Compile / target SDK: 35
 - JDK: 17
-- Gradle: 8.9 (CI generates the wrapper if absent)
+- Gradle: 8.9 (installed directly by CI; no wrapper is committed)
 
 The `.github/workflows/android-build.yml` GitHub Actions workflow runs Android lint and unit-test tasks, then assembles debug and release APK artifacts. Release signing and production AdMob IDs are supplied only through the documented GitHub Actions secrets; without a signing keystore, the release APK is unsigned. The repository currently has no Gradle wrapper, so CI installs Gradle 8.9 directly. A successful CI run, physical-device QA, a signed release build and Play Console review are required before calling this release-ready.
