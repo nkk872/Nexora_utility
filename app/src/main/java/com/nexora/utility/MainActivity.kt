@@ -13,6 +13,14 @@ import androidx.documentfile.provider.DocumentFile
 import android.net.Uri
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.VpnService
+import android.app.Activity.RESULT_OK
+import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+import com.wireguard.android.backend.GoBackend
+import com.wireguard.android.backend.Tunnel
+import com.wireguard.android.backend.Tunnel.State
+import com.wireguard.config.Config
+import java.io.FileInputStream
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -71,7 +79,7 @@ private fun NexoraApp(activity: Activity) {
                 Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("NEXORA", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-                        Text(when (page) { Page.HOME -> "Utility"; Page.CLEANER -> "Smart cleaner"; Page.STORAGE -> "Storage"; Page.VAULT -> "Private vault"; Page.VPN -> "VPN setup"; Page.TOOLS -> "Device tools" }, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                        Text(when (page) { Page.HOME -> "Utility"; Page.CLEANER -> "Smart cleaner"; Page.STORAGE -> "Storage"; Page.VAULT -> "Private vault"; Page.VPN -> "Nexora VPN"; Page.TOOLS -> "Device tools" }, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                     }
                     Text("●", color = Accent, fontSize = 20.sp)
                 }
@@ -88,7 +96,7 @@ private fun NexoraApp(activity: Activity) {
                         })
                     Page.STORAGE -> StoragePage(activity)
                     Page.VAULT -> VaultPage(activity)
-                    Page.VPN -> ProtonVpnPage(activity)
+                    Page.VPN -> NexoraVpnPage(activity)
                     Page.TOOLS -> ToolsPage(activity) { notice = it }
                 }
             }
@@ -332,82 +340,109 @@ private fun VaultPage(activity: Activity) {
 }
 
 @Composable
-private fun VpnPage(activity: Activity) {
-    var active by remember { mutableStateOf(isVpnActive(activity)) }
-    var message by remember { mutableStateOf("No provider has been selected in Nexora. Configure one in Android VPN settings.") }
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(20.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("ANDROID VPN", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
-            Text(if (active) "VPN transport detected" else "No active VPN detected", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text(if (active) "Android currently reports an active VPN network. Nexora does not know which provider operates it or verify its privacy/security." else "Choose and install a trusted VPN provider first. Android's built-in VPN settings can configure supported provider profiles.", color = SecondaryText, fontSize = 13.sp)
-        }
-        Button(onClick = {
-            runCatching { activity.startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
-                .onFailure { message = "Android VPN settings are unavailable on this device." }
-        }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
-            Text("Open Android VPN settings")
-        }
-        OutlinedButton(onClick = {
-            active = isVpnActive(activity)
-            message = if (active) "Android reports an active VPN transport." else "No active VPN transport is currently reported."
-        }, modifier = Modifier.fillMaxWidth()) { Text("Refresh VPN status", color = Accent) }
-        Text(message, color = SecondaryText, fontSize = 12.sp)
-        Text("Provider setup: install a VPN service you trust, then follow its instructions in Android VPN settings. Enter provider credentials only in the provider's official app or Android's system settings—not in Nexora or this chat.", color = SecondaryText, fontSize = 12.sp)
-        Text("Important: detecting Android's VPN transport does not verify the provider, encryption protocol, server location, DNS routing, kill switch or absence of leaks. Nexora will never claim those checks passed without dedicated verification.", color = SecondaryText, fontSize = 12.sp)
-    }
-}
-
-private fun isVpnActive(activity: Activity): Boolean = runCatching {
-    val manager = activity.getSystemService(ConnectivityManager::class.java) ?: return@runCatching false
-    val network = manager.activeNetwork ?: return@runCatching false
-    manager.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-}.getOrDefault(false)
-
-
-@Composable
-private fun ProtonVpnPage(activity: Activity) {
+private fun NexoraVpnPage(activity: Activity) {
     val context = LocalContext.current
-    val packageName = "ch.protonvpn.android"
-    val protonInstalled = remember {
-        runCatching { activity.packageManager.getPackageInfo(packageName, 0) }.isSuccess
+    val vault = remember { VaultStore(context) }
+    val preferences = remember { context.getSharedPreferences("nexora_vpn", 0) }
+    var profileId by remember { mutableStateOf(preferences.getString("wireguard_profile_id", null)) }
+    var status by remember { mutableStateOf(WireGuardRuntime.state.name) }
+    var message by remember { mutableStateOf("Import a WireGuard .conf profile to configure your own VPN connection.") }
+    var busy by remember { mutableStateOf(false) }
+    val importPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                val entry = vault.encrypt(uri)
+                preferences.edit().putString("wireguard_profile_id", entry.id).apply()
+                profileId = entry.id
+                message = "WireGuard profile encrypted and saved on this device."
+            }.onFailure { message = "Could not securely import this profile. Please try again." }
+        }
     }
-    var refreshKey by remember { mutableIntStateOf(0) }
-    val vpnActive = remember(refreshKey) {
-        val manager = activity.getSystemService(ConnectivityManager::class.java)
-        manager?.allNetworks?.any { network ->
-            manager.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-        } == true
+    val connectNow: () -> Unit = {
+        val id = profileId
+        if (id == null) {
+            message = "Import a WireGuard profile first."
+        } else {
+            busy = true
+            message = "Starting WireGuard tunnel…"
+            Thread {
+                val result = runCatching {
+                    val temp = vault.decryptToCache(id)
+                    try {
+                        val config = FileInputStream(temp).use { Config.parse(it) }
+                        WireGuardRuntime.connect(context, config)
+                    } finally { temp.delete() }
+                }
+                activity.runOnUiThread {
+                    busy = false
+                    status = WireGuardRuntime.state.name
+                    message = result.fold(
+                        { "WireGuard engine started. A peer handshake is still required before traffic is confirmed." },
+                        { "Connection failed: " + (it.message ?: "Check the profile and server endpoint.") }
+                    )
+                }
+            }.start()
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) connectNow()
+        else message = "Android VPN permission was not granted."
     }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text("PROTON VPN", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-            Text("Private connection, powered by Proton.", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("Nexora uses the official Proton VPN Android app to create and manage the encrypted tunnel. Your Proton account and VPN credentials stay inside Proton's app.", color = SecondaryText, fontSize = 13.sp)
-            Text(if (vpnActive) "Android reports an active VPN connection" else "No active VPN connection detected", color = if (vpnActive) Accent else SecondaryText, fontWeight = FontWeight.SemiBold)
-            Text("This is device-wide VPN status. Android does not disclose the VPN provider identity to Nexora, so this status alone cannot prove the connection is Proton.", color = SecondaryText, fontSize = 11.sp)
+            Text("NEXORA VPN • WIREGUARD", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Text(if (status == "UP") "Tunnel engine running" else "Your private VPN", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("Open-source WireGuard tunnel engine embedded inside Nexora. Your profile is encrypted at rest using Android Keystore.", color = SecondaryText, fontSize = 13.sp)
+            Text("Engine state: $status", color = if (status == "UP") Accent else SecondaryText, fontWeight = FontWeight.SemiBold)
+        }
+        Button(onClick = { importPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
+            Text(if (profileId == null) "Import WireGuard profile (.conf)" else "Replace WireGuard profile")
+        }
+        Text(if (profileId == null) "No profile imported" else "Encrypted WireGuard profile saved on this device", color = SecondaryText, fontSize = 12.sp)
+        Button(onClick = {
+            val permission = VpnService.prepare(activity)
+            if (permission != null) permissionLauncher.launch(permission) else connectNow()
+        }, enabled = !busy && profileId != null && status != "UP", modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
+            Text(if (busy) "Connecting…" else "Connect VPN")
         }
         Button(onClick = {
-            val launch = activity.packageManager.getLaunchIntentForPackage(packageName)
-            if (launch != null) activity.startActivity(launch)
-            else activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
-        }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
-            Text(if (protonInstalled) "Open Proton VPN" else "Install Proton VPN")
+            busy = true
+            Thread {
+                val result = runCatching { WireGuardRuntime.disconnect() }
+                activity.runOnUiThread {
+                    busy = false
+                    status = WireGuardRuntime.state.name
+                    message = if (result.isSuccess) "Tunnel stopped." else "Could not stop tunnel: " + (result.exceptionOrNull()?.message ?: "unknown error")
+                }
+            }.start()
+        }, enabled = !busy && status == "UP", modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
+            Text("Disconnect")
         }
-        Button(onClick = {
-            runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://account.protonvpn.com/downloads"))) }
-        }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
-            Text("Proton configuration and downloads")
-        }
-        Button(onClick = {
-            runCatching { activity.startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
-        }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
-            Text("Android VPN settings")
-        }
-        Button(onClick = { refreshKey++ }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
-            Text("Refresh VPN status")
-        }
-        Text("Setup: install/open Proton VPN, sign in there, choose a server and tap Connect. Approve Android's VPN connection prompt. Keep Proton VPN installed; Nexora does not store your Proton password or private keys.", color = SecondaryText, fontSize = 12.sp)
-        Text("Provider features such as kill switch, NetShield, Secure Core and protocol selection remain controlled by the official Proton VPN app. Nexora does not claim to control these features.", color = SecondaryText, fontSize = 12.sp)
+        Text(message, color = SecondaryText, fontSize = 12.sp)
+        Text("Important: Nexora is now a WireGuard VPN client, not a VPN server/provider. A valid .conf profile must point to a reachable WireGuard server that you own or have permission to use. The app cannot create internet egress servers or supply free VPN locations by itself.", color = SecondaryText, fontSize = 12.sp)
+        Text("A running engine does not prove the server handshake or leak protection. Verify the peer handshake, public IP, IPv4/IPv6 and DNS routing on a real device before release.", color = SecondaryText, fontSize = 12.sp)
+    }
+}
+
+private object WireGuardRuntime {
+    @Volatile var state: State = State.DOWN
+        private set
+    @Volatile private var backend: GoBackend? = null
+    private val tunnel = object : Tunnel {
+        override fun getName(): String = "Nexora"
+        override fun onStateChange(newState: State) { state = newState }
+    }
+    @Synchronized
+    fun connect(context: android.content.Context, config: Config) {
+        val engine = backend ?: GoBackend(context.applicationContext).also { backend = it }
+        engine.setState(tunnel, State.UP, config)
+        state = engine.getState(tunnel)
+    }
+    @Synchronized
+    fun disconnect() {
+        val engine = backend ?: return
+        engine.setState(tunnel, State.DOWN, null)
+        state = engine.getState(tunnel)
     }
 }
 
