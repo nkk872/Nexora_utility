@@ -147,7 +147,7 @@ private fun CleanerPage(cacheSize: Long, notice: String, refresh: () -> Unit, cl
     }
 }
 
-private data class ScannedFile(val uri: Uri, val name: String, val size: Long)
+private data class ScannedFile(val uri: Uri, val name: String, val size: Long, val mimeType: String?)
 
 @Composable
 private fun StoragePage(activity: Activity) {
@@ -157,7 +157,7 @@ private fun StoragePage(activity: Activity) {
     var duplicateGroups by remember { mutableStateOf<List<DuplicateScanner.DuplicateGroup>>(emptyList()) }
     var duplicateMessage by remember { mutableStateOf("Duplicate scan checks exact file contents, not similar photos.") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var scanMessage by remember { mutableStateOf("Choose a folder to review large files. Nothing is deleted automatically.") }
+    var scanMessage by remember { mutableStateOf("Choose a folder to review photos, videos and large files. Nothing is deleted automatically.") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             runCatching {
@@ -172,16 +172,20 @@ private fun StoragePage(activity: Activity) {
                         if (item.isDirectory) walk(item)
                         else if (item.isFile) {
                             val size = item.length()
-                            if (size >= 20L * 1024L * 1024L) found.add(ScannedFile(item.uri, item.name ?: "Unnamed file", size))
+                            val mime = item.type
+                            val isMedia = mime?.startsWith("image/") == true || mime?.startsWith("video/") == true
+                            if (isMedia || size >= 20L * 1024L * 1024L) {
+                                found.add(ScannedFile(item.uri, item.name ?: "Unnamed file", size, mime))
+                            }
                         }
                     }
                 }
                 if (root != null) walk(root)
-                files = found.sortedByDescending { it.size }.take(100)
+                files = found.distinctBy { it.uri.toString() }.sortedByDescending { it.size }.take(500)
                 selected = emptySet()
                 duplicateGroups = emptyList()
                 folderLabel = root?.name ?: "Selected folder"
-                scanMessage = "Reviewed $visited folder entries. Large-file matches are shown below."
+                scanMessage = "Reviewed $visited entries. Found " + files.size + " photos, videos and large files (up to 500 shown)."
             }.onFailure { scanMessage = "Could not read this folder. Please choose it again." }
         }
     }
@@ -224,7 +228,7 @@ private fun StoragePage(activity: Activity) {
         item {
             Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("LARGE FILE REVIEW", color = Accent, fontWeight = FontWeight.Bold)
-                Text("Choose a folder. Nexora will list files 20 MB or larger; it will never delete anything until you select files and confirm.", color = SecondaryText, fontSize = 12.sp)
+                Text("Choose a folder. Nexora reviews image/video files plus files 20 MB or larger. Nothing is deleted until you select items and confirm.", color = SecondaryText, fontSize = 12.sp)
                 Button(onClick = { picker.launch(null) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) { Text("Choose folder to scan") }
                 Text(folderLabel, color = SecondaryText, fontSize = 12.sp)
                 Text(scanMessage, color = SecondaryText, fontSize = 12.sp)
@@ -232,14 +236,14 @@ private fun StoragePage(activity: Activity) {
         }
         if (files.isNotEmpty()) {
             item {
-                Text("Large files (${files.size})", fontWeight = FontWeight.Bold)
+                Text("Photos, videos and large files (${files.size})", fontWeight = FontWeight.Bold)
                 Button(onClick = {
                     duplicateGroups = DuplicateScanner.findDuplicates(
                         activity.contentResolver,
                         files.map { DuplicateScanner.Candidate(it.uri, it.name, it.size) }
                     )
                     duplicateMessage = "Checked ${files.size} listed large files. Exact matches are grouped below."
-                }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) { Text("Find exact duplicates in listed files") }
+                }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) { Text("Find exact photo, video and file duplicates") }
                 Text(duplicateMessage, color = SecondaryText, fontSize = 11.sp)
             }
             items(files, key = { it.uri.toString() }) { file ->
@@ -249,7 +253,7 @@ private fun StoragePage(activity: Activity) {
                     })
                     Column(Modifier.weight(1f)) {
                         Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
-                        Text(formatBytes(file.size), color = SecondaryText, fontSize = 12.sp)
+                        Text("${formatBytes(file.size)} • ${file.mimeType ?: "File"}", color = SecondaryText, fontSize = 12.sp)
                     }
                 }
             }
@@ -268,7 +272,7 @@ private fun StoragePage(activity: Activity) {
                 }
             }
         }
-        item { Text("The scan only accesses the folder you explicitly select through Android's system file picker. It is limited to 5,000 entries per scan and displays up to 100 large files.", color = SecondaryText, fontSize = 12.sp) }
+        item { Text("The scan only accesses the folder you explicitly select through Android's system file picker. It reviews up to 5,000 entries and shows up to 500 media/large-file matches. Exact duplicate checks are content-based, bounded to the displayed list and files up to 250 MB each; similar-looking photos are not matched.", color = SecondaryText, fontSize = 12.sp) }
     }
 }
 
