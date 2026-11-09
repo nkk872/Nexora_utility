@@ -430,7 +430,7 @@ private fun NexoraVpnPage(activity: Activity) {
                     Text(server.countryShort, color = Accent, fontWeight = FontWeight.Bold)
                 }
                 Text("Ping ${server.pingMs} ms  •  ${server.speedMbps} Mbps  •  ${server.sessions} sessions", color = SecondaryText, fontSize = 12.sp)
-                Text(if (selected?.hostName == server.hostName) "Selected" else "OpenVPN profile available", color = if (selected == server.hostName) Accent else SecondaryText, fontSize = 11.sp)
+                Text(if (selected?.hostName == server.hostName) "Selected" else "OpenVPN profile available", color = if (selected?.hostName == server.hostName) Accent else SecondaryText, fontSize = 11.sp)
                 Button(
                     onClick = {
                         selected = server
