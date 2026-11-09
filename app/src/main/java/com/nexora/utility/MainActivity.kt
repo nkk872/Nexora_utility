@@ -7,6 +7,10 @@ import android.os.Environment
 import android.os.StatFs
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.documentfile.provider.DocumentFile
+import android.net.Uri
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,7 +18,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -77,7 +84,7 @@ private fun NexoraApp(activity: Activity) {
                             val freed = (before - cacheSize).coerceAtLeast(0)
                             notice = "Removed " + formatBytes(freed) + " from this app's cache."
                         })
-                    Page.STORAGE -> StoragePage()
+                    Page.STORAGE -> StoragePage(activity)
                     Page.TOOLS -> ToolsPage(activity) { notice = it }
                 }
             }
@@ -127,23 +134,106 @@ private fun CleanerPage(cacheSize: Long, notice: String, refresh: () -> Unit, cl
     }
 }
 
+private data class ScannedFile(val uri: Uri, val name: String, val size: Long)
+
 @Composable
-private fun StoragePage() {
+private fun StoragePage(activity: Activity) {
+    var folderLabel by remember { mutableStateOf("No folder selected") }
+    var files by remember { mutableStateOf<List<ScannedFile>>(emptyList()) }
+    var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var scanMessage by remember { mutableStateOf("Choose a folder to review large files. Nothing is deleted automatically.") }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            runCatching {
+                activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                val root = DocumentFile.fromTreeUri(activity, uri)
+                val found = mutableListOf<ScannedFile>()
+                var visited = 0
+                fun walk(dir: DocumentFile) {
+                    if (visited >= 5000) return
+                    dir.listFiles().forEach { item ->
+                        visited++
+                        if (item.isDirectory) walk(item)
+                        else if (item.isFile) {
+                            val size = item.length()
+                            if (size >= 20L * 1024L * 1024L) found.add(ScannedFile(item.uri, item.name ?: "Unnamed file", size))
+                        }
+                    }
+                }
+                if (root != null) walk(root)
+                files = found.sortedByDescending { it.size }.take(100)
+                selected = emptySet()
+                folderLabel = root?.name ?: "Selected folder"
+                scanMessage = "Reviewed $visited folder entries. Large-file matches are shown below."
+            }.onFailure { scanMessage = "Could not read this folder. Please choose it again." }
+        }
+    }
     val stats = remember { runCatching { StatFs(Environment.getDataDirectory().path) }.getOrNull() }
     val total = stats?.totalBytes ?: 0L
     val free = stats?.availableBytes ?: 0L
     val used = (total - free).coerceAtLeast(0)
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(20.dp)) {
-            Text("INTERNAL STORAGE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-            Spacer(Modifier.height(12.dp))
-            Text(if (total > 0) formatBytes(used) else "Unavailable", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-            Text("Used of " + formatBytes(total) + " total", color = SecondaryText)
-            Spacer(Modifier.height(16.dp))
-            if (total > 0) LinearProgressIndicator(progress = { used.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(8.dp), color = Accent, trackColor = Color(0xFF29352F))
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete selected files?") },
+            text = { Text("This permanently deletes ${selected.size} selected file(s) from the folder you chose. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val targets = files.filter { selected.contains(it.uri.toString()) }
+                    var removed = 0
+                    targets.forEach { item -> if (runCatching { DocumentFile.fromSingleUri(activity, item.uri)?.delete() ?: false }.getOrDefault(false)) removed++ }
+                    files = files.filterNot { selected.contains(it.uri.toString()) }
+                    selected = emptySet()
+                    scanMessage = "Deleted $removed of ${targets.size} selected file(s)."
+                    showDeleteConfirm = false
+                }) { Text("Delete", color = Color(0xFFFF7777)) }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } }
+        )
+    }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(20.dp)) {
+                Text("INTERNAL STORAGE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Spacer(Modifier.height(12.dp))
+                Text(if (total > 0) formatBytes(used) else "Unavailable", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                Text("Used of " + formatBytes(total) + " total", color = SecondaryText)
+                Spacer(Modifier.height(12.dp))
+                if (total > 0) LinearProgressIndicator(progress = { used.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(8.dp), color = Accent, trackColor = Color(0xFF29352F))
+                Spacer(Modifier.height(10.dp))
+                Text("Available: " + if (total > 0) formatBytes(free) else "Unavailable", color = SecondaryText, fontSize = 13.sp)
+            }
         }
-        MetricCard("Available space", if (total > 0) formatBytes(free) else "Unavailable", Modifier.fillMaxWidth())
-        Text("Storage figures come from Android's filesystem statistics. They are estimates of the shared data partition, not a scan of every personal file.", color = SecondaryText, fontSize = 13.sp)
+        item {
+            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("LARGE FILE REVIEW", color = Accent, fontWeight = FontWeight.Bold)
+                Text("Choose a folder. Nexora will list files 20 MB or larger; it will never delete anything until you select files and confirm.", color = SecondaryText, fontSize = 12.sp)
+                Button(onClick = { picker.launch(null) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) { Text("Choose folder to scan") }
+                Text(folderLabel, color = SecondaryText, fontSize = 12.sp)
+                Text(scanMessage, color = SecondaryText, fontSize = 12.sp)
+            }
+        }
+        if (files.isNotEmpty()) {
+            item { Text("Large files (${files.size})", fontWeight = FontWeight.Bold) }
+            items(files, key = { it.uri.toString() }) { file ->
+                Row(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(14.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = selected.contains(file.uri.toString()), onCheckedChange = { checked ->
+                        selected = if (checked) selected + file.uri.toString() else selected - file.uri.toString()
+                    })
+                    Column(Modifier.weight(1f)) {
+                        Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+                        Text(formatBytes(file.size), color = SecondaryText, fontSize = 12.sp)
+                    }
+                }
+            }
+            item {
+                Button(onClick = { showDeleteConfirm = true }, enabled = selected.isNotEmpty(), modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9D3434))) {
+                    Text("Delete selected (${selected.size})")
+                }
+            }
+        }
+        item { Text("The scan only accesses the folder you explicitly select through Android's system file picker. It is limited to 5,000 entries per scan and displays up to 100 large files.", color = SecondaryText, fontSize = 12.sp) }
     }
 }
 
