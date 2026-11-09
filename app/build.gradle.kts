@@ -5,7 +5,7 @@ plugins {
 }
 android {
     namespace = "com.nexora.utility"
-    compileSdk = 35
+    compileSdk = 36
     val ownerAdmobAppId = System.getenv("NEXORA_ADMOB_APP_ID")?.takeIf { it.isNotBlank() }
     val ownerBannerUnitId = System.getenv("NEXORA_ADMOB_BANNER_ID")?.takeIf { it.isNotBlank() }
     val useProductionAds = ownerAdmobAppId != null && ownerBannerUnitId != null
@@ -14,7 +14,7 @@ android {
     defaultConfig {
         applicationId = "com.nexora.utility"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
         manifestPlaceholders["ADMOB_APP_ID"] = resolvedAdmobAppId
