@@ -16,7 +16,7 @@ Last updated: 2026-11-09.
 - Exact SHA-256 duplicate grouping for the large files currently displayed by the folder scan. This is a bounded review, not a full-device media scan; no automatic deletion.
 - Encrypted vault screen using AES-256-GCM and a non-exportable Android Keystore key. User can import a file into encrypted app-private storage, export a decrypted copy to a chosen destination, and delete the encrypted vault copy. Original source files are left untouched.
 - Vault does not yet have a separate PIN/biometric gate. It must not be described as PIN/biometric protected.
-- Tools diagnostics: device manufacturer/model, Android version/API, available RAM, battery percentage and thermal status when supported.
+- Tools diagnostics: device manufacturer/model, Android version/API, available RAM, battery percentage and thermal status when supported. Fixed escaped Kotlin string interpolation so these diagnostics render actual device values.
 - Tools shortcuts to Android App info, network, display, battery and sound settings.
 
 ## Eight development stages
@@ -31,7 +31,7 @@ Last updated: 2026-11-09.
 
 ## Build verification
 - Existing `.github/workflows/android-ci.yml` runs on `main` pushes, pull requests, and manual dispatch. It installs JDK 17 / Android SDK 35, provisions Gradle 8.9, generates the wrapper when absent, compiles Kotlin, runs lint and unit tests, and assembles debug plus unsigned release APKs as workflow artifacts.
-- Updated the workflow to `gradle/actions/setup-gradle@v6`.
+- Updated the workflow to `gradle/actions/setup-gradle@v6` and fixed the diagnostics string interpolation in `MainActivity.kt`.
 - A source commit has been pushed to trigger CI, but no successful workflow result or APK artifact has yet been observed. Build status remains unverified until GitHub Actions completes.
 - No local Android SDK / Gradle build was run in this environment.
 - Do not mark any release as build-ready until an actual successful CI build and physical-device QA are observed.
