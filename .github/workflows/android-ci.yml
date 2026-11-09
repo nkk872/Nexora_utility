@@ -98,10 +98,29 @@ jobs:
       - name: Build debug APK
         run: ./gradlew --no-daemon --stacktrace :app:assembleDebug
 
-      - name: Build release APK (unsigned unless signing secrets are configured)
+      - name: Decode optional release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.NEXORA_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexora-release.jks"
+            echo "NEXORA_KEYSTORE_PATH=$RUNNER_TEMP/nexora-release.jks" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build release APK (signed when owner secrets are configured)
+        env:
+          NEXORA_KEYSTORE_PASSWORD: ${{ secrets.NEXORA_KEYSTORE_PASSWORD }}
+          NEXORA_KEY_ALIAS: ${{ secrets.NEXORA_KEY_ALIAS }}
+          NEXORA_KEY_PASSWORD: ${{ secrets.NEXORA_KEY_PASSWORD }}
         run: ./gradlew --no-daemon --stacktrace :app:assembleRelease
 
-      - name: Build release Android App Bundle (unsigned unless signing secrets are configured)
+      - name: Build release Android App Bundle (signed when owner secrets are configured)
+        env:
+          NEXORA_KEYSTORE_PASSWORD: ${{ secrets.NEXORA_KEYSTORE_PASSWORD }}
+          NEXORA_KEY_ALIAS: ${{ secrets.NEXORA_KEY_ALIAS }}
+          NEXORA_KEY_PASSWORD: ${{ secrets.NEXORA_KEY_PASSWORD }}
         run: ./gradlew --no-daemon --stacktrace :app:bundleRelease
 
       - name: Upload APK outputs
