@@ -2,38 +2,41 @@
 
 Last updated: 2026-11-09.
 
-## Repository changes
+## Repository
 - Repository: `nkk872/Nexora_utility`, branch `main`.
-- Added Gradle settings, root build configuration, version catalog and app module configuration.
-- Added Kotlin + Jetpack Compose app entry point and dark emerald interface.
-- Replaced the old manifest, which referenced missing resources and services, with a minimal launcher manifest.
-- Added AndroidX DocumentFile and a user-selected folder scan through Android's Storage Access Framework.
+- Existing Kotlin + Jetpack Compose foundation retained; no project restart or duplicate setup.
+- Dark black / emerald-green interface; free product, no premium tier or paid unlocks.
 
-## Implemented in source (not yet build-verified)
-- Home dashboard and navigation: Home, Clean, Storage and Tools.
-- Nexora-owned cache estimate, refresh and explicit cache clearing.
-- Internal data-partition total/used/available storage figures.
-- Folder picker to scan only the directory explicitly selected by the user.
-- Large-file review (files at least 20 MB; scan capped at 5,000 entries and display capped at 100).
-- Per-file selection and a second confirmation before deletion.
-- Launchers for Android app, network, display, battery and sound settings.
-- Least-privilege manifest: no broad file access, overlay, accessibility, VPN or package visibility permissions are enabled.
+## Current implementation
+- Home, Clean, Storage, Vault and Tools navigation.
+- Nexora-owned cache estimate and explicit clearing of Nexora's own cache only.
+- Internal data-partition storage figures.
+- User-selected folder scan through Android Storage Access Framework; large files >=20 MB, scan capped at 5,000 entries, display capped at 100.
+- Explicit per-file selection and confirmation before deletion.
+- Exact SHA-256 duplicate grouping for the large files currently displayed by the folder scan. This is a bounded review, not a full-device media scan; no automatic deletion.
+- Encrypted vault screen using AES-256-GCM and a non-exportable Android Keystore key. User can import a file into encrypted app-private storage, export a decrypted copy to a chosen destination, and delete the encrypted vault copy. Original source files are left untouched.
+- Vault does not yet have a separate PIN/biometric gate. It must not be described as PIN/biometric protected.
+- Tools shortcuts to Android App info, network, display, battery and sound settings.
 
-## Not yet implemented
-- Duplicate-photo detection and a full category-based media browser.
-- Encrypted private vault and biometric/PIN access.
-- App lock / app hiding; Android and Google Play restrictions must be respected.
-- Game tools and device diagnostics beyond system settings shortcuts.
-- VPN client. No VPN connection may be claimed until a provider profile is configured and a real handshake and routed traffic are verified.
-- AdMob and UMP. No ad IDs or live advertising have been configured.
+## Eight development stages
+1. Cleaner and storage analyzer — source implementation present; Android build/device verification pending.
+2. Duplicate photo/video detection — exact duplicate hashing is implemented for the currently listed large files only; broad media selection and full test coverage remain.
+3. Encrypted private vault — encrypted storage/import/export is implemented; separate PIN/biometric access gate and security QA remain.
+4. App lock — not implemented. System-wide locking of other apps is restricted and requires careful Android/Play policy review. Do not fake this.
+5. App manager / app hiding — only Android App info settings shortcut exists. Arbitrary app hiding is not supported for ordinary apps; supported app-management flow remains.
+6. Device diagnostics / game tools — basic system-settings shortcuts exist; actual diagnostics and honest game information remain.
+7. VPN — not implemented. Requires a selected provider, profile/credentials and Android VPN consent; connection must be verified by handshake and routed traffic before reporting connected.
+8. Ads, testing and release — no AdMob IDs or UMP consent integration configured; no successful build, lint, test, APK, AAB or device QA confirmed.
 
-## Verification
-- No successful Android build, lint result, test result, APK artifact, or physical-device QA result has yet been confirmed after these commits.
-- GitHub Actions is configured to compile Kotlin, run lint/tests and assemble debug and release APKs on project changes. The latest result must be checked before any APK is called build-ready.
+## Build verification
+- CI workflow is configured to compile Kotlin, run lint/unit tests, and assemble debug/release APKs.
+- GitHub connector currently exposes no workflow run for the latest direct pushes; combined commit status is empty. Therefore CI success is not confirmed.
+- Local build could not be run in this environment because GitHub/Gradle dependencies cannot be fetched.
+- Do not mark any release as build-ready until an actual successful CI build and device QA are observed.
 
-## Product and monetization rules
-- Free app; no subscriptions, premium tier, credits, paid unlocks or in-app purchases.
-- At most one anchored adaptive banner at the bottom of the app.
+## Product / monetization rules
+- Free to use: no subscriptions, premium tier, credits, paid unlocks or in-app purchases.
+- At most one anchored adaptive banner at the bottom.
 - No interstitial, rewarded, app-open, native/in-feed, top, pop-up, notification or full-screen ads.
-- Never delete personal files without explicit selection and confirmation.
-- Never claim fabricated cache savings, RAM gains, battery health, VPN status or performance boosts.
+- Do not enable live ads without the owner's real AdMob App ID and banner unit ID, consent flow, privacy disclosures and QA.
+- Never silently delete personal files or claim fabricated VPN, cache, RAM, battery or performance results.
