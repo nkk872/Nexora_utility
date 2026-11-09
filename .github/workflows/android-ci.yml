@@ -29,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: nexora-android-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
