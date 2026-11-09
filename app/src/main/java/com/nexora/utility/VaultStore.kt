@@ -29,6 +29,14 @@ class VaultStore(private val context: Context) {
     private val directory: File
         get() = File(context.filesDir, "private_vault").apply { mkdirs() }
 
+    /** Removes plaintext leftovers if Android killed the app during a previous export or preview. */
+    fun cleanupTemporaryFiles(): Int {
+        val leftovers = context.cacheDir.listFiles()
+            .orEmpty()
+            .filter { it.isFile && it.name.startsWith("vault-") && it.name.endsWith(".tmp") }
+        return leftovers.count { it.delete() }
+    }
+
     fun entries(): List<Entry> = directory.listFiles()
         .orEmpty()
         .filter { it.isFile && it.extension == "nexora" }
