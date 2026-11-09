@@ -126,16 +126,9 @@ private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
                 }
                 when (page) {
                     Page.HOME -> HomePage(cacheSize, notice) { page = it }
-                    Page.CLEANER -> CleanerPage(cacheSize, notice,
-                        refresh = { cacheSize = readCacheSize(activity); notice = "Cache estimate refreshed." },
-                        clean = {
-                            val before = readCacheSize(activity)
-                            val cleanerCache = File(activity.cacheDir, "nexora_cleaner")
-                            cleanerCache.listFiles().orEmpty().forEach { it.deleteRecursively() }
-                            cacheSize = readCacheSize(activity)
-                            val freed = (before - cacheSize).coerceAtLeast(0)
-                            notice = "Removed " + formatBytes(freed) + " of cleaner temporary files."
-                        })
+                    Page.CLEANER -> CleanerPage(activity, cacheSize, notice,
+                        refresh = { cacheSize = it },
+                        clean = { freed -> cacheSize = readCacheSize(activity); notice = "Removed " + formatBytes(freed) + " of cleaner temporary files." })
                     Page.STORAGE -> StoragePage(activity)
                     Page.VAULT -> VaultPage(activity)
                     Page.VPN -> NexoraVpnPage(activity)
@@ -191,22 +184,90 @@ private fun HomePage(cacheSize: Long, notice: String, open: (Page) -> Unit) {
 private fun CleanerPage(cacheSize: Long, notice: String, refresh: () -> Unit, clean: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("SAFE CLEANUP", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.@Composable
+private fun CleanerPage(activity: Activity, cacheSize: Long, notice: String, refresh: (Long) -> Unit, clean: (Long) -> Unit) {
+    var busy by remember { mutableStateOf(false) }
+    var progress by remember { mutableFloatStateOf(0f) }
+    var progressLabel by remember { mutableStateOf("") }
+    var localMessage by remember { mutableStateOf("") }
+    var cancelRequested by remember { mutableStateOf(false) }
+    var workerCancel by remember { mutableStateOf<java.util.concurrent.atomic.AtomicBoolean?>(null) }
+
+    fun startWork(cleanFiles: Boolean) {
+        if (busy) return
+        val cancelFlag = java.util.concurrent.atomic.AtomicBoolean(false)
+        workerCancel = cancelFlag
+        busy = true
+        cancelRequested = false
+        progress = 0f
+        progressLabel = if (cleanFiles) "Preparing cleanup…" else "Scanning temporary files…"
+        localMessage = ""
+        Thread {
+            val directory = File(activity.cacheDir, "nexora_cleaner")
+            val result = runCatching {
+                if (!directory.exists()) directory.mkdirs()
+                val allFiles = directory.walkTopDown().filter { it.isFile }.toList()
+                var completed = 0
+                var totalBytes = 0L
+                allFiles.forEach { file ->
+                    if (cancelFlag.get()) throw InterruptedException("Cancelled")
+                    if (cleanFiles) {
+                        val size = file.length()
+                        if (file.delete()) totalBytes += size
+                    } else {
+                        totalBytes += file.length()
+                    }
+                    completed++
+                    val fraction = if (allFiles.isEmpty()) 1f else completed.toFloat() / allFiles.size.toFloat()
+                    activity.runOnUiThread {
+                        progress = fraction
+                        progressLabel = if (cleanFiles) "Cleaning $completed of ${allFiles.size} files" else "Scanning $completed of ${allFiles.size} files"
+                    }
+                }
+                totalBytes
+            }
+            activity.runOnUiThread {
+                busy = false
+                workerCancel = null
+                if (result.isSuccess) {
+                    val value = result.getOrThrow()
+                    if (cleanFiles) {
+                        clean(value)
+                        localMessage = if (cancelFlag.get()) "Cleanup cancelled. Completed files were removed; remaining files are safe." else "Cleanup complete."
+                    } else {
+                        refresh(value)
+                        localMessage = "Scan complete."
+                    }
+                } else {
+                    localMessage = if (cancelFlag.get()) "Operation cancelled. No files outside the cleaner folder were touched." else "Could not complete this operation. Try again."
+                }
+            }
+        }.start()
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("SAFE CLEANUP", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(formatBytes(cacheSize), fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                    Text("Temporary Nexora cache", color = SecondaryText, fontSize = 13.sp)
+                    Text("Nexora cleaner temporary files", color = SecondaryText, fontSize = 13.sp)
                 }
                 Box(Modifier.size(72.dp).background(Accent.copy(alpha = .12f), RoundedCornerShape(22.dp)), contentAlignment = Alignment.Center) { Text("✦", color = Accent, fontSize = 36.sp) }
             }
-            Text("Only files owned by Nexora are included in this estimate.", color = SecondaryText, fontSize = 12.sp)
+            Text("Only files in Nexora's dedicated cleaner folder are included.", color = SecondaryText, fontSize = 12.sp)
         }
-        Button(onClick = refresh, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B2B23), contentColor = Accent), contentPadding = PaddingValues(vertical = 13.dp)) { Text("Refresh scan") }
-        Button(onClick = clean, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background), contentPadding = PaddingValues(vertical = 14.dp)) { Text("Clean temporary files", fontWeight = FontWeight.SemiBold) }
-        Text(notice, color = Accent, fontSize = 12.sp)
+        Button(onClick = { startWork(false) }, enabled = !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B2B23), contentColor = Accent), contentPadding = PaddingValues(vertical = 13.dp)) { Text("Refresh scan") }
+        Button(onClick = { startWork(true) }, enabled = !busy && cacheSize > 0, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background), contentPadding = PaddingValues(vertical = 14.dp)) { Text("Clean temporary files", fontWeight = FontWeight.SemiBold) }
+        if (busy) {
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = Accent, trackColor = Color(0xFF29352F))
+            Text(progressLabel, color = SecondaryText, fontSize = 12.sp)
+            OutlinedButton(onClick = { workerCancel?.set(true); cancelRequested = true }, modifier = Modifier.fillMaxWidth()) { Text(if (cancelRequested) "Cancelling…" else "Cancel operation") }
+        }
+        Text(localMessage.ifBlank { notice }, color = Accent, fontSize = 12.sp)
         Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(16.dp)).padding(14.dp)) {
             Text("Privacy protection", fontWeight = FontWeight.SemiBold)
-            Text("Android does not let ordinary apps silently clear other apps' caches. Nexora only removes its own temporary files.", color = SecondaryText, fontSize = 12.sp)
+            Text("Android does not let ordinary apps silently clear other apps' caches. Nexora only removes its own dedicated cleaner temporary files. Vault data and other app cache files are excluded.", color = SecondaryText, fontSize = 12.sp)
         }
     }
 }
