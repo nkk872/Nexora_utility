@@ -27,4 +27,4 @@ Free to use. The only permitted advertising placement is one anchored adaptive b
 - JDK: 17
 - Gradle: 8.9 (CI generates the wrapper if absent)
 
-GitHub Actions CI is being added to compile Kotlin, run lint and unit tests, and assemble a debug APK. A successful CI run and physical-device QA are required before calling this release-ready.
+The `.github/workflows/android-ci.yml` GitHub Actions workflow compiles Kotlin, runs Android lint and unit tests, and assembles debug and unsigned release APK artifacts. A successful CI run and physical-device QA are required before calling this release-ready.
