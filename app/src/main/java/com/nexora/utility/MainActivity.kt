@@ -330,7 +330,22 @@ private fun VaultPage(activity: Activity) {
 
 @Composable
 private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
+    val memoryInfo = android.app.ActivityManager.MemoryInfo()
+    activity.getSystemService(android.app.ActivityManager::class.java)?.getMemoryInfo(memoryInfo)
+    val batteryPercent = activity.getSystemService(android.os.BatteryManager::class.java)
+        ?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("DEVICE DIAGNOSTICS", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text("\${android.os.Build.MANUFACTURER} \${android.os.Build.MODEL}", fontWeight = FontWeight.SemiBold)
+            Text("Android \${android.os.Build.VERSION.RELEASE} (API \${android.os.Build.VERSION.SDK_INT})", color = SecondaryText, fontSize = 12.sp)
+            Text("Available RAM: \${if (memoryInfo.availMem > 0) formatBytes(memoryInfo.availMem) else "Unavailable"}", color = SecondaryText, fontSize = 12.sp)
+            Text("Battery: \${if (batteryPercent in 0..100) "$batteryPercent%" else "Unavailable"}", color = SecondaryText, fontSize = 12.sp)
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                val thermal = activity.getSystemService(android.os.PowerManager::class.java)?.currentThermalStatus
+                Text("Thermal status: \${when (thermal) { 0 -> "None"; 1 -> "Light"; 2 -> "Moderate"; 3 -> "Severe"; 4 -> "Critical"; 5 -> "Emergency"; 6 -> "Shutdown"; else -> "Unavailable" }}", color = SecondaryText, fontSize = 12.sp)
+            }
+        }
         Text("Use Android's secure system screens for device-level controls.", color = SecondaryText, fontSize = 13.sp)
         FeatureRow("App settings", "Manage permissions, storage and uninstall apps", "▣") {
             launchSetting(activity, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + activity.packageName)), report)
