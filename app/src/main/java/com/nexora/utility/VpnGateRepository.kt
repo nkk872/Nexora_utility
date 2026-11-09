@@ -3,7 +3,6 @@ package com.nexora.utility
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Base64
-import java.util.Locale
 
 data class VpnGateServer(
     val hostName: String,
