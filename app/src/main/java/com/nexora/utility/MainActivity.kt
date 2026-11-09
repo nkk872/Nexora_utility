@@ -745,11 +745,17 @@ private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
         FeatureRow("App settings", "Manage permissions, storage and uninstall apps", "▣") {
             launchSetting(activity, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + activity.packageName)), report)
         }
+        FeatureRow("Installed app management", "Open Android settings to review, manage or uninstall apps", "▤") {
+            launchSetting(activity, Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS), report)
+        }
+        FeatureRow("Game settings", "Open your phone's built-in game controls if available", "🎮") {
+            launchSetting(activity, Intent("android.settings.GAME_SETTINGS"), report)
+        }
         FeatureRow("Network settings", "Manage Wi-Fi, mobile network and VPN", "⌁") { launchSetting(activity, Intent(Settings.ACTION_WIRELESS_SETTINGS), report) }
         FeatureRow("Display settings", "Brightness, screen timeout and display", "☼") { launchSetting(activity, Intent(Settings.ACTION_DISPLAY_SETTINGS), report) }
         FeatureRow("Battery settings", "Battery usage and power controls", "ϟ") { launchSetting(activity, Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS), report) }
         FeatureRow("Sound settings", "Volume and sound preferences", "♫") { launchSetting(activity, Intent(Settings.ACTION_SOUND_SETTINGS), report) }
-        Text("Game booster, app hiding, app locking and VPN require additional Android permissions or a real VPN provider. They are not represented as active until implemented and tested.", color = SecondaryText, fontSize = 12.sp)
+        Text("Game settings are provided by your phone manufacturer when available; Nexora does not claim to boost FPS or CPU/GPU performance. Android restricts system-wide app locking and hiding for ordinary apps.", color = SecondaryText, fontSize = 12.sp)
     }
 }
 
