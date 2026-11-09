@@ -219,35 +219,45 @@ private fun StoragePage(activity: Activity) {
     var scanMessage by remember { mutableStateOf("Choose a folder to review photos, videos and large files. Nothing is deleted automatically.") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
-            runCatching {
-                activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                val root = DocumentFile.fromTreeUri(activity, uri)
-                val found = mutableListOf<ScannedFile>()
-                var visited = 0
-                fun walk(dir: DocumentFile) {
-                    if (visited >= 5000) return
-                    for (item in dir.listFiles()) {
-                        if (visited >= 5000) break
-                        visited++
-                        if (item.isDirectory) {
-                            walk(item)
-                        } else if (item.isFile) {
-                            val size = item.length()
-                            val mime = item.type
-                            val isMedia = mime?.startsWith("image/") == true || mime?.startsWith("video/") == true
-                            if (isMedia || size >= 20L * 1024L * 1024L) {
-                                found.add(ScannedFile(item, item.uri, item.name ?: "Unnamed file", size, mime))
+            scanMessage = "Scanning selected folder in the background…"
+            Thread {
+                val result = runCatching {
+                    activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                    val root = DocumentFile.fromTreeUri(activity, uri)
+                    val found = mutableListOf<ScannedFile>()
+                    var visited = 0
+                    fun walk(dir: DocumentFile) {
+                        if (visited >= 5000) return
+                        for (item in dir.listFiles()) {
+                            if (visited >= 5000) break
+                            visited++
+                            if (item.isDirectory) {
+                                walk(item)
+                            } else if (item.isFile) {
+                                val size = item.length()
+                                val mime = item.type
+                                val isMedia = mime?.startsWith("image/") == true || mime?.startsWith("video/") == true
+                                if (isMedia || size >= 20L * 1024L * 1024L) {
+                                    found.add(ScannedFile(item, item.uri, item.name ?: "Unnamed file", size, mime))
+                                }
                             }
                         }
                     }
+                    if (root != null) walk(root)
+                    Triple(root?.name ?: "Selected folder", visited, found.distinctBy { it.uri.toString() }.sortedByDescending { it.size }.take(500))
                 }
-                if (root != null) walk(root)
-                files = found.distinctBy { it.uri.toString() }.sortedByDescending { it.size }.take(500)
-                selected = emptySet()
-                duplicateGroups = emptyList()
-                folderLabel = root?.name ?: "Selected folder"
-                scanMessage = "Reviewed $visited entries. Found " + found.size + " photos, videos and large files (up to 500 shown)."
-            }.onFailure { scanMessage = "Could not read this folder. Please choose it again." }
+                activity.runOnUiThread {
+                    result.onSuccess { (name, visited, matches) ->
+                        files = matches
+                        selected = emptySet()
+                        duplicateGroups = emptyList()
+                        folderLabel = name
+                        scanMessage = "Reviewed $visited entries. Found ${matches.size} photos, videos and large files (up to 500 shown)."
+                    }.onFailure {
+                        scanMessage = "Could not read this folder. Please choose it again."
+                    }
+                }
+            }.start()
         }
     }
     val stats = remember { runCatching { StatFs(Environment.getDataDirectory().path) }.getOrNull() }
