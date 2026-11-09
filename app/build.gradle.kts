@@ -6,12 +6,19 @@ plugins {
 android {
     namespace = "com.nexora.utility"
     compileSdk = 35
+    val ownerAdmobAppId = System.getenv("NEXORA_ADMOB_APP_ID")?.takeIf { it.isNotBlank() }
+    val ownerBannerUnitId = System.getenv("NEXORA_ADMOB_BANNER_ID")?.takeIf { it.isNotBlank() }
+    val useProductionAds = ownerAdmobAppId != null && ownerBannerUnitId != null
+    val resolvedAdmobAppId = if (useProductionAds) ownerAdmobAppId!! else "ca-app-pub-3940256099942544~3347511713"
+    val resolvedBannerUnitId = if (useProductionAds) ownerBannerUnitId!! else "ca-app-pub-3940256099942544/9214589741"
     defaultConfig {
         applicationId = "com.nexora.utility"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        manifestPlaceholders["ADMOB_APP_ID"] = resolvedAdmobAppId
+        buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$resolvedBannerUnitId\"")
     }
     val releaseKeystorePath = System.getenv("NEXORA_KEYSTORE_PATH")
     val releaseStorePassword = System.getenv("NEXORA_KEYSTORE_PASSWORD")
@@ -34,6 +41,7 @@ android {
     buildFeatures {
         compose = true
         aidl = true
+        buildConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
