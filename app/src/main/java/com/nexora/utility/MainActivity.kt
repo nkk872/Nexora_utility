@@ -2,6 +2,8 @@ package com.nexora.utility
 
 import android.app.Activity
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.os.Environment
 import android.os.StatFs
@@ -34,7 +36,7 @@ private val Background = Color(0xFF080D0B)
 private val SurfaceDark = Color(0xFF121B17)
 private val Accent = Color(0xFF39D98A)
 private val SecondaryText = Color(0xFFA2B2A9)
-private enum class Page { HOME, CLEANER, STORAGE, VAULT, TOOLS }
+private enum class Page { HOME, CLEANER, STORAGE, VAULT, VPN, TOOLS }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,10 +57,10 @@ private fun NexoraApp(activity: Activity) {
     )) {
         Scaffold(containerColor = Background, bottomBar = {
             NavigationBar(containerColor = SurfaceDark) {
-                listOf(Page.HOME to "Home", Page.CLEANER to "Clean", Page.STORAGE to "Storage", Page.VAULT to "Vault", Page.TOOLS to "Tools").forEach { (target, label) ->
+                listOf(Page.HOME to "Home", Page.CLEANER to "Clean", Page.STORAGE to "Storage", Page.VAULT to "Vault", Page.VPN to "VPN", Page.TOOLS to "Tools").forEach { (target, label) ->
                     NavigationBarItem(
                         selected = page == target, onClick = { page = target },
-                        icon = { Text(when (target) { Page.HOME -> "⌂"; Page.CLEANER -> "✦"; Page.STORAGE -> "▤"; Page.VAULT -> "▣"; Page.TOOLS -> "⚙" }, fontSize = 20.sp) },
+                        icon = { Text(when (target) { Page.HOME -> "⌂"; Page.CLEANER -> "✦"; Page.STORAGE -> "▤"; Page.VAULT -> "▣"; Page.VPN -> "⌁"; Page.TOOLS -> "⚙" }, fontSize = 20.sp) },
                         label = { Text(label) },
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = Accent, selectedTextColor = Accent, indicatorColor = Accent.copy(alpha = .12f), unselectedTextColor = SecondaryText)
                     )
@@ -69,7 +71,7 @@ private fun NexoraApp(activity: Activity) {
                 Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("NEXORA", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-                        Text(when (page) { Page.HOME -> "Utility"; Page.CLEANER -> "Smart cleaner"; Page.STORAGE -> "Storage"; Page.VAULT -> "Private vault"; Page.TOOLS -> "Device tools" }, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                        Text(when (page) { Page.HOME -> "Utility"; Page.CLEANER -> "Smart cleaner"; Page.STORAGE -> "Storage"; Page.VAULT -> "Private vault"; Page.VPN -> "VPN setup"; Page.TOOLS -> "Device tools" }, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                     }
                     Text("●", color = Accent, fontSize = 20.sp)
                 }
@@ -86,6 +88,7 @@ private fun NexoraApp(activity: Activity) {
                         })
                     Page.STORAGE -> StoragePage(activity)
                     Page.VAULT -> VaultPage(activity)
+                    Page.VPN -> VpnPage(activity)
                     Page.TOOLS -> ToolsPage(activity) { notice = it }
                 }
             }
@@ -327,6 +330,38 @@ private fun VaultPage(activity: Activity) {
         }
     }
 }
+
+@Composable
+private fun VpnPage(activity: Activity) {
+    var active by remember { mutableStateOf(isVpnActive(activity)) }
+    var message by remember { mutableStateOf("No provider has been selected in Nexora. Configure one in Android VPN settings.") }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(20.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("ANDROID VPN", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+            Text(if (active) "VPN transport detected" else "No active VPN detected", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(if (active) "Android currently reports an active VPN network. Nexora does not know which provider operates it or verify its privacy/security." else "Choose and install a trusted VPN provider first. Android's built-in VPN settings can configure supported provider profiles.", color = SecondaryText, fontSize = 13.sp)
+        }
+        Button(onClick = {
+            runCatching { activity.startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
+                .onFailure { message = "Android VPN settings are unavailable on this device." }
+        }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
+            Text("Open Android VPN settings")
+        }
+        OutlinedButton(onClick = {
+            active = isVpnActive(activity)
+            message = if (active) "Android reports an active VPN transport." else "No active VPN transport is currently reported."
+        }, modifier = Modifier.fillMaxWidth()) { Text("Refresh VPN status", color = Accent) }
+        Text(message, color = SecondaryText, fontSize = 12.sp)
+        Text("Provider setup: install a VPN service you trust, then follow its instructions in Android VPN settings. Enter provider credentials only in the provider's official app or Android's system settings—not in Nexora or this chat.", color = SecondaryText, fontSize = 12.sp)
+        Text("Important: detecting Android's VPN transport does not verify the provider, encryption protocol, server location, DNS routing, kill switch or absence of leaks. Nexora will never claim those checks passed without dedicated verification.", color = SecondaryText, fontSize = 12.sp)
+    }
+}
+
+private fun isVpnActive(activity: Activity): Boolean = runCatching {
+    val manager = activity.getSystemService(ConnectivityManager::class.java) ?: return@runCatching false
+    val network = manager.activeNetwork ?: return@runCatching false
+    manager.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+}.getOrDefault(false)
 
 @Composable
 private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
