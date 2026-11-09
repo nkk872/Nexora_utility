@@ -1058,6 +1058,8 @@ private object WireGuardRuntime {
 
 @Composable
 private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
+    var diagnosticsRefresh by remember { mutableIntStateOf(0) }
+    val refreshTick = diagnosticsRefresh
     val memoryInfo = android.app.ActivityManager.MemoryInfo()
     activity.getSystemService(android.app.ActivityManager::class.java)?.getMemoryInfo(memoryInfo)
     val batteryPercent = activity.getSystemService(android.os.BatteryManager::class.java)
@@ -1073,20 +1075,32 @@ private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
         else -> "Unknown"
     }
     val plugged = (batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0
+    val batteryStatus = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+    val powerState = when (batteryStatus) {
+        android.os.BatteryManager.BATTERY_STATUS_CHARGING -> "Charging"
+        android.os.BatteryManager.BATTERY_STATUS_FULL -> "Full"
+        android.os.BatteryManager.BATTERY_STATUS_DISCHARGING -> "Discharging"
+        android.os.BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "Not charging"
+        else -> if (plugged) "Connected" else "On battery"
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("DEVICE DIAGNOSTICS", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("DEVICE DIAGNOSTICS", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
+            TextButton(onClick = { diagnosticsRefresh++ }) { Text("Refresh", color = Accent) }
+        }
         Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("THIS DEVICE", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.5.sp)
             Text("${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Text("Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})", color = SecondaryText, fontSize = 12.sp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MetricCard("Available RAM", if (memoryInfo.availMem > 0) formatBytes(memoryInfo.availMem) else "Unavailable", Modifier.weight(1f))
-                MetricCard("Battery", if (batteryPercent in 0..100) "$batteryPercent%" else "Unavailable", Modifier.weight(1f))
+                MetricCard("Total RAM", if (memoryInfo.totalMem > 0) formatBytes(memoryInfo.totalMem) else "Unavailable", Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricCard("Battery health", batteryHealth, Modifier.weight(1f))
-                MetricCard("Power", if (plugged) "Charging / plugged" else "On battery", Modifier.weight(1f))
+                MetricCard("Battery", if (batteryPercent in 0..100) "$batteryPercent%" else "Unavailable", Modifier.weight(1f))
+                MetricCard("Power state", powerState, Modifier.weight(1f))
             }
+            Text("Battery health: $batteryHealth", color = SecondaryText, fontSize = 12.sp)
             Text(
                 "Battery temperature: " + if (batteryTemperature >= 0) String.format(Locale.US, "%.1f °C", batteryTemperature / 10.0) else "Unavailable",
                 color = SecondaryText, fontSize = 12.sp
