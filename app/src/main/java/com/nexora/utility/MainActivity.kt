@@ -7,6 +7,7 @@ import android.os.Environment
 import android.os.StatFs
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
@@ -46,7 +47,7 @@ private val Accent = Color(0xFF39D98A)
 private val SecondaryText = Color(0xFFA2B2A9)
 private enum class Page { HOME, CLEANER, STORAGE, VAULT, VPN, TOOLS }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { NexoraApp(this) }
@@ -275,12 +276,19 @@ private fun StoragePage(activity: Activity) {
 @Composable
 private fun VaultPage(activity: Activity) {
     val context = LocalContext.current
+    val fragmentActivity = activity as? androidx.fragment.app.FragmentActivity
     val store = remember { VaultStore(context) }
     var entries by remember { mutableStateOf(store.entries()) }
-    var message by remember { mutableStateOf("Files are encrypted with an Android Keystore AES-256-GCM key.") }
+    var message by remember { mutableStateOf("Unlock with your device biometric or screen-lock credential to access your encrypted vault.") }
+    var unlocked by remember { mutableStateOf(false) }
     var exportingId by remember { mutableStateOf<String?>(null) }
+    val authenticators = androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or
+        androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    val biometricManager = remember(context) { androidx.biometric.BiometricManager.from(context) }
+    val authAvailability = biometricManager.canAuthenticate(authenticators)
+
     val importPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
+        if (uri != null && unlocked) {
             runCatching { store.encrypt(uri) }
                 .onSuccess {
                     entries = store.entries()
@@ -291,7 +299,7 @@ private fun VaultPage(activity: Activity) {
     }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val id = exportingId
-        if (uri != null && id != null) {
+        if (uri != null && id != null && unlocked) {
             val result = runCatching {
                 val temp = store.decryptToCache(id)
                 try {
@@ -304,12 +312,74 @@ private fun VaultPage(activity: Activity) {
         }
         exportingId = null
     }
+
+    if (!unlocked) {
+        Column(
+            Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("PRIVATE VAULT LOCKED", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+            Text("Your files stay private.", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            Text("Unlock with your Android biometric or device screen-lock credential before viewing, exporting or deleting vault files.", color = SecondaryText, fontSize = 13.sp)
+            Button(
+                onClick = {
+                    val host = fragmentActivity
+                    if (host == null) {
+                        message = "Secure unlock is unavailable in this activity."
+                    } else if (authAvailability != androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS) {
+                        message = "Set up a device screen lock or enroll a strong biometric in Android Settings, then try again."
+                    } else {
+                        val prompt = androidx.biometric.BiometricPrompt(
+                            host,
+                            androidx.core.content.ContextCompat.getMainExecutor(context),
+                            object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+                                override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
+                                    unlocked = true
+                                    entries = store.entries()
+                                    message = "Vault unlocked."
+                                }
+                                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                    message = "Vault remains locked: $errString"
+                                }
+                                override fun onAuthenticationFailed() {
+                                    message = "Authentication not recognized. Try again."
+                                }
+                            }
+                        )
+                        val info = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+                            .setTitle("Unlock Nexora Private Vault")
+                            .setSubtitle("Confirm your identity to access encrypted files")
+                            .setAllowedAuthenticators(authenticators)
+                            .build()
+                        prompt.authenticate(info)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = authAvailability == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS,
+                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)
+            ) { Text("Unlock vault") }
+            Text(
+                if (authAvailability == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS)
+                    "Device authentication is available."
+                else "A secure screen lock or strong biometric must be configured in Android Settings.",
+                color = SecondaryText, fontSize = 12.sp
+            )
+            Text(message, color = SecondaryText, fontSize = 12.sp)
+        }
+        return
+    }
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(20.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("ENCRYPTED STORAGE", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
-                Text("Your files, encrypted.", fontSize = 23.sp, fontWeight = FontWeight.Bold)
-                Text("AES-256-GCM encryption with a non-exportable Android Keystore key. Original files are not removed.", color = SecondaryText, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("ENCRYPTED STORAGE", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+                        Text("Your files, encrypted.", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                    }
+                    TextButton(onClick = { unlocked = false; message = "Vault locked." }) { Text("Lock", color = Accent) }
+                }
+                Text("AES-256-GCM encryption with a non-exportable Android Keystore key. Vault access also requires device authentication.", color = SecondaryText, fontSize = 12.sp)
                 Button(onClick = { importPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) { Text("Add file to vault") }
                 Text(message, color = SecondaryText, fontSize = 12.sp)
             }
@@ -334,7 +404,7 @@ private fun VaultPage(activity: Activity) {
             }
         }
         item {
-            Text("Security note: this version encrypts files at rest but does not yet require a separate PIN or biometric prompt to open the vault. Protect your device with Android screen lock.", color = SecondaryText, fontSize = 12.sp)
+            Text("Vault content is encrypted at rest. Access is gated by the device's configured biometric or screen-lock credential; this is an in-app vault lock, not a system-wide app lock.", color = SecondaryText, fontSize = 12.sp)
         }
     }
 }
