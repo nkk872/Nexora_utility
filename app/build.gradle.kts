@@ -74,6 +74,7 @@ android {
     }
 }
 dependencies {
+    testImplementation(libs.junit)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.biometric)
     implementation(libs.google.mobile.ads)
