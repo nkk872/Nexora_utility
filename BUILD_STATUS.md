@@ -5,20 +5,22 @@ Last updated: 2026-11-09.
 ## Repository changes
 - Repository: `nkk872/Nexora_utility`, branch `main`.
 - Added Gradle settings, root build configuration, version catalog and app module configuration.
-- Added a Kotlin + Jetpack Compose application entry point.
-- Replaced the previous manifest, which referenced missing resources and service classes, with a minimal launcher manifest.
-- The Android CI workflow is configured to compile Kotlin, run Android lint/tests and assemble a debug APK when the project files change.
+- Added Kotlin + Jetpack Compose app entry point and dark emerald interface.
+- Replaced the old manifest, which referenced missing resources and services, with a minimal launcher manifest.
+- Added AndroidX DocumentFile and a user-selected folder scan through Android's Storage Access Framework.
 
 ## Implemented in source (not yet build-verified)
-- Home dashboard and black/emerald-green styling.
-- Nexora-owned cache size estimate, refresh and explicit cache clearing.
+- Home dashboard and navigation: Home, Clean, Storage and Tools.
+- Nexora-owned cache estimate, refresh and explicit cache clearing.
 - Internal data-partition total/used/available storage figures.
+- Folder picker to scan only the directory explicitly selected by the user.
+- Large-file review (files at least 20 MB; scan capped at 5,000 entries and display capped at 100).
+- Per-file selection and a second confirmation before deletion.
 - Launchers for Android app, network, display, battery and sound settings.
-- Least-privilege manifest: no broad file access, overlay, accessibility, VPN or package visibility permissions are enabled by this starter implementation.
+- Least-privilege manifest: no broad file access, overlay, accessibility, VPN or package visibility permissions are enabled.
 
 ## Not yet implemented
-- User-selected shared-storage file scan and deletion review.
-- Large-file and duplicate-photo detection.
+- Duplicate-photo detection and a full category-based media browser.
 - Encrypted private vault and biometric/PIN access.
 - App lock / app hiding; Android and Google Play restrictions must be respected.
 - Game tools and device diagnostics beyond system settings shortcuts.
@@ -27,7 +29,7 @@ Last updated: 2026-11-09.
 
 ## Verification
 - No successful Android build, lint result, test result, APK artifact, or physical-device QA result has yet been confirmed after these commits.
-- CI should run automatically on the main-branch file changes. Check the latest GitHub Actions run before proceeding to release packaging.
+- GitHub Actions is configured to compile Kotlin, run lint/tests and assemble debug and release APKs on project changes. The latest result must be checked before any APK is called build-ready.
 
 ## Product and monetization rules
 - Free app; no subscriptions, premium tier, credits, paid unlocks or in-app purchases.
