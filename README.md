@@ -25,8 +25,8 @@ Free to use. The only permitted advertising placement is one anchored adaptive b
 ## Build
 - Application ID: `com.nexora.utility`
 - Minimum Android: API 26
-- Compile / target SDK: 35
+- Compile / target SDK: 36
 - JDK: 17
-- Gradle: 8.9 (installed directly by CI; no wrapper is committed)
+- Android Gradle Plugin: 8.10.1; Gradle: 8.11.1 (installed directly by CI; no wrapper is committed)
 
-The `.github/workflows/android-build.yml` GitHub Actions workflow runs Android lint and unit-test tasks, then assembles debug and release APK artifacts. Release signing and production AdMob IDs are supplied only through the documented GitHub Actions secrets; without a signing keystore, the release APK is unsigned. The repository currently has no Gradle wrapper, so CI installs Gradle 8.9 directly. A successful CI run, physical-device QA, a signed release build and Play Console review are required before calling this release-ready.
+The `.github/workflows/android-build.yml` GitHub Actions workflow runs Android lint and unit-test tasks, then assembles debug and release APK artifacts. Release signing uses the optional `NEXORA_KEYSTORE_BASE64`, `NEXORA_KEYSTORE_PASSWORD`, `NEXORA_KEY_ALIAS` and `NEXORA_KEY_PASSWORD` GitHub Actions secrets; without a signing keystore, the release APK is unsigned. Production AdMob IDs use `NEXORA_ADMOB_APP_ID` and `NEXORA_ADMOB_BANNER_ID`. The repository currently has no Gradle wrapper, so CI installs Gradle 8.9 directly. A successful CI run, physical-device QA, a signed release build and Play Console review are required before calling this release-ready.
