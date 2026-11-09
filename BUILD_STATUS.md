@@ -26,20 +26,21 @@ Last updated: 2026-11-09.
 4. App lock — not implemented. System-wide locking of other apps is restricted and requires careful Android/Play policy review. Do not fake this.
 5. App manager / app hiding — only Android App info settings shortcut exists. Arbitrary app hiding is not supported for ordinary apps; supported app-management flow remains.
 6. Device diagnostics / game tools — basic live diagnostics and system-settings shortcuts are implemented; game-specific tools remain.
-7. VPN — Proton VPN companion integration implemented in the app UI. Nexora can open/install the official Proton VPN Android app, open Proton's configuration/download page, open Android VPN settings, and detect an active Android VPN transport. Proton login, tunnel, server selection, kill switch and DNS protection remain managed by Proton's official app. Android's generic VPN transport indicator cannot identify Proton or prove traffic/DNS leak safety; physical-device connection and leak QA remain pending.
+7. VPN — built-in WireGuard client engine added using the official embeddable `com.wireguard.android:tunnel` library. Nexora imports a user-supplied WireGuard `.conf` profile into the existing AES-256-GCM Android Keystore vault, requests Android VPN consent, and can start/stop a `GoBackend` tunnel. This is a client, not a server/provider: a reachable WireGuard server and valid peer profile are required. Handshake, traffic routing, IP/DNS leak protection and physical-device QA remain unverified.
 8. Ads, testing and release — no AdMob IDs or UMP consent integration configured; no successful build, lint, test, APK, AAB or device QA confirmed.
 
 ## VPN implementation details
-- Added a Proton VPN destination to the existing Compose navigation.
-- Opens the official Proton VPN Android app when installed, otherwise its Play Store listing; links to Proton's account downloads and Android VPN settings.
-- Detects whether Android reports an active VPN transport. This is not provider identification and does not prove Proton is connected.
-- Adds only ACCESS_NETWORK_STATE and a package visibility query for Proton's official app. Nexora does not collect Proton credentials, embed a tunnel, or store private keys.
-- Proton's official Android app remains responsible for server selection, tunnel lifecycle, kill switch, NetShield and protocol settings.
+- Replaced the Proton companion shortcut with an in-app WireGuard client screen.
+- Uses the official embeddable WireGuard tunnel AAR from Maven Central and the userspace backend; root access is not required.
+- Imports `.conf` via Android's document picker and encrypts it using the existing Android Keystore AES-256-GCM vault; only the encrypted vault ID is stored in preferences.
+- Requests Android VPN consent before connecting and provides connect/disconnect controls.
+- No VPN server, relay infrastructure, subscription service or free exit locations are supplied. A valid profile for a reachable WireGuard server is required.
+- Build, handshake, route, DNS/IP leak, reconnect, foreground-service and physical-device QA remain release gates.
 
 ## Build verification
 - Existing `.github/workflows/android-ci.yml` runs on `main` pushes, pull requests, and manual dispatch. It installs JDK 17 / Android SDK 35, provisions Gradle 8.9, generates the wrapper when absent, compiles Kotlin, runs lint and unit tests, and assembles debug plus unsigned release APKs as workflow artifacts.
 - Updated the workflow to `gradle/actions/setup-gradle@v6` and fixed the diagnostics string interpolation in `MainActivity.kt`.
-- A source commit has been pushed to trigger CI, but no successful workflow result or APK artifact has yet been observed. Proton VPN companion integration also requires device testing with the official Proton app installed. Build status remains unverified until GitHub Actions completes.
+- A source commit has been pushed to trigger CI, but no successful workflow result or APK artifact has yet been observed. Built-in WireGuard integration requires a successful CI build and physical-device testing with a valid server profile. Build status remains unverified until GitHub Actions completes.
 - No local Android SDK / Gradle build was run in this environment.
 - Do not mark any release as build-ready until an actual successful CI build and physical-device QA are observed.
 
