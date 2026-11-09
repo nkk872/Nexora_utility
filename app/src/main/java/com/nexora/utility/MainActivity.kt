@@ -206,7 +206,7 @@ private fun CleanerPage(cacheSize: Long, notice: String, refresh: () -> Unit, cl
     }
 }
 
-private data class ScannedFile(val uri: Uri, val name: String, val size: Long, val mimeType: String?)
+private data class ScannedFile(val document: DocumentFile, val uri: Uri, val name: String, val size: Long, val mimeType: String?)
 
 @Composable
 private fun StoragePage(activity: Activity) {
@@ -236,7 +236,7 @@ private fun StoragePage(activity: Activity) {
                             val mime = item.type
                             val isMedia = mime?.startsWith("image/") == true || mime?.startsWith("video/") == true
                             if (isMedia || size >= 20L * 1024L * 1024L) {
-                                found.add(ScannedFile(item.uri, item.name ?: "Unnamed file", size, mime))
+                                found.add(ScannedFile(item, item.uri, item.name ?: "Unnamed file", size, mime))
                             }
                         }
                     }
@@ -262,11 +262,13 @@ private fun StoragePage(activity: Activity) {
             confirmButton = {
                 TextButton(onClick = {
                     val targets = files.filter { selected.contains(it.uri.toString()) }
-                    var removed = 0
-                    targets.forEach { item -> if (runCatching { DocumentFile.fromSingleUri(activity, item.uri)?.delete() ?: false }.getOrDefault(false)) removed++ }
-                    files = files.filterNot { selected.contains(it.uri.toString()) }
-                    selected = emptySet()
-                    scanMessage = "Deleted $removed of ${targets.size} selected file(s)."
+                    val deletedUris = targets.filter { item ->
+                        runCatching { item.document.delete() }.getOrDefault(false)
+                    }.map { it.uri.toString() }.toSet()
+                    files = files.filterNot { deletedUris.contains(it.uri.toString()) }
+                    selected = selected - deletedUris
+                    scanMessage = "Deleted ${deletedUris.size} of ${targets.size} selected file(s). " +
+                        if (deletedUris.size == targets.size) "Selected files removed." else "Files that could not be be deleted remain listed."
                     showDeleteConfirm = false
                 }) { Text("Delete", color = Color(0xFFFF7777)) }
             },
