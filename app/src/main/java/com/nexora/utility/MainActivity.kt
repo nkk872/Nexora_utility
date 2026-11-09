@@ -83,21 +83,37 @@ private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
     )) {
         Scaffold(containerColor = Background, bottomBar = {
             Column {
-                NavigationBar(containerColor = SurfaceDark) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(62.dp).background(SurfaceDark),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     listOf(Page.HOME to "Home", Page.CLEANER to "Clean", Page.STORAGE to "Storage", Page.VAULT to "Vault", Page.VPN to "VPN", Page.TOOLS to "Tools").forEach { (target, label) ->
-                        NavigationBarItem(
-                            selected = page == target, onClick = { page = target },
-                            icon = { Text(when (target) { Page.HOME -> "⌂"; Page.CLEANER -> "✦"; Page.STORAGE -> "▤"; Page.VAULT -> "▣"; Page.VPN -> "⌁"; Page.TOOLS -> "⚙" }, fontSize = 20.sp) },
-                            label = { Text(label) },
-                            colors = NavigationBarItemDefaults.colors(selectedIconColor = Accent, selectedTextColor = Accent, indicatorColor = Accent.copy(alpha = .12f), unselectedTextColor = SecondaryText)
-                        )
+                        val selected = page == target
+                        Column(
+                            modifier = Modifier.weight(1f).fillMaxHeight().clickable { page = target }.padding(vertical = 5.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier.size(if (selected) 34.dp else 30.dp)
+                                    .background(if (selected) Accent.copy(alpha = .13f) else Color.Transparent, RoundedCornerShape(50)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    when (target) { Page.HOME -> "⌂"; Page.CLEANER -> "✦"; Page.STORAGE -> "▤"; Page.VAULT -> "▣"; Page.VPN -> "⌁"; Page.TOOLS -> "⚙" },
+                                    color = if (selected) Accent else SecondaryText,
+                                    fontSize = 19.sp
+                                )
+                            }
+                            Text(label, color = if (selected) Accent else SecondaryText, fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+                        }
                     }
                 }
                 if (adsAllowed && BuildConfig.ADMOB_BANNER_UNIT_ID.isNotBlank() && page != Page.VAULT) AnchoredBannerAd()
             }
         }) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
-                Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
+                Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("NEXORA", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
                         Text(when (page) { Page.HOME -> "Utility"; Page.CLEANER -> "Smart cleaner"; Page.STORAGE -> "Storage"; Page.VAULT -> "Private vault"; Page.VPN -> "Nexora VPN"; Page.TOOLS -> "Device tools" }, fontSize = 27.sp, fontWeight = FontWeight.Bold)
@@ -129,12 +145,27 @@ private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
 private fun HomePage(cacheSize: Long, notice: String, open: (Page) -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(24.dp)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("DEVICE CARE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                Text("A cleaner, calmer phone.", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text("Simple tools that respect your files and privacy.", color = SecondaryText)
-                Spacer(Modifier.height(4.dp))
-                Text(notice, color = Accent, fontSize = 12.sp)
+            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("DEVICE CARE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                        Text("Your phone, in better shape.", fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 27.sp)
+                        Text("A clear view of storage, privacy and device health.", color = SecondaryText, fontSize = 13.sp)
+                    }
+                    Box(
+                        Modifier.size(66.dp).background(Accent.copy(alpha = .12f), RoundedCornerShape(22.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("✦", color = Accent, fontSize = 34.sp)
+                    }
+                }
+                Button(
+                    onClick = { open(Page.CLEANER) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background),
+                    contentPadding = PaddingValues(vertical = 10.dp)
+                ) { Text("Scan & optimize", fontWeight = FontWeight.SemiBold) }
+                Text(notice, color = Accent, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -822,16 +853,16 @@ private fun launchSetting(activity: Activity, intent: Intent, report: (String) -
 
 @Composable
 private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier.background(SurfaceDark, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, color = SecondaryText, fontSize = 12.sp)
-        Text(value, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    Column(modifier.background(SurfaceDark, RoundedCornerShape(18.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, color = SecondaryText, fontSize = 11.sp)
+        Text(value, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
 private fun FeatureRow(title: String, description: String, glyph: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(18.dp)).clickable(onClick = onClick).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(42.dp).background(Accent.copy(alpha = .12f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+    Row(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(20.dp)).clickable(onClick = onClick).padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).background(Accent.copy(alpha = .12f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
             Text(glyph, color = Accent, fontSize = 20.sp)
         }
         Spacer(Modifier.width(14.dp))
