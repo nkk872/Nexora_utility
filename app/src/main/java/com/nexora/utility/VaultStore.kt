@@ -59,6 +59,28 @@ class VaultStore(private val context: Context) {
         }
     }
 
+    fun encryptBytes(bytes: ByteArray): Entry {
+        val id = UUID.randomUUID().toString()
+        val target = File(directory, "$id.nexora")
+        val cipher = Cipher.getInstance(TRANSFORMATION).apply {
+            init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+        }
+        try {
+            FileOutputStream(target).use { fileOut ->
+                fileOut.write(MAGIC)
+                fileOut.write(cipher.iv.size)
+                fileOut.write(cipher.iv)
+                CipherOutputStream(fileOut, cipher).use { encryptedOut ->
+                    encryptedOut.write(bytes)
+                }
+            }
+            return Entry(id, target.length())
+        } catch (error: Exception) {
+            target.delete()
+            throw error
+        }
+    }
+
     /** Decrypts to app-private cache; caller should share/open then remove the temp file. */
     fun decryptToCache(id: String): File {
         require(id.matches(Regex("[a-f0-9-]{36}"))) { "Invalid vault item" }
