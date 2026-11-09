@@ -62,8 +62,19 @@ object VpnGateRepository {
         }
     }
 
-    fun decodeOpenVpnProfile(server: VpnGateServer): String =
-        String(Base64.getDecoder().decode(server.configBase64), Charsets.UTF_8)
+    fun decodeOpenVpnProfile(server: VpnGateServer): String {
+        val decoded = Base64.getDecoder().decode(server.configBase64)
+        require(decoded.isNotEmpty() && decoded.size <= 1024 * 1024) {
+            "VPN profile is empty or unexpectedly large."
+        }
+        val profile = String(decoded, Charsets.UTF_8)
+        require(profile.contains(Regex("(?m)^\\s*client\\s*$")) &&
+            profile.contains(Regex("(?m)^\\s*remote\\s+\\S+\\s+\\d+"))) {
+            "VPN provider returned an invalid OpenVPN client profile."
+        }
+        require(!profile.contains("\u0000")) { "VPN profile contains invalid data." }
+        return profile
+    }
 
     private fun parseCsvLine(line: String): List<String> {
         val values = mutableListOf<String>()
