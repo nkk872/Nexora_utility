@@ -85,6 +85,7 @@ private fun NexoraApp(activity: Activity) {
                             notice = "Removed " + formatBytes(freed) + " from this app's cache."
                         })
                     Page.STORAGE -> StoragePage(activity)
+                    Page.VAULT -> VaultPage(activity)
                     Page.TOOLS -> ToolsPage(activity) { notice = it }
                 }
             }
@@ -234,6 +235,74 @@ private fun StoragePage(activity: Activity) {
             }
         }
         item { Text("The scan only accesses the folder you explicitly select through Android's system file picker. It is limited to 5,000 entries per scan and displays up to 100 large files.", color = SecondaryText, fontSize = 12.sp) }
+    }
+}
+
+
+@Composable
+private fun VaultPage(activity: Activity) {
+    val context = LocalContext.current
+    val store = remember { VaultStore(context) }
+    var entries by remember { mutableStateOf(store.entries()) }
+    var message by remember { mutableStateOf("Files are encrypted with an Android Keystore AES-256-GCM key.") }
+    var exportingId by remember { mutableStateOf<String?>(null) }
+    val importPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { store.encrypt(uri) }
+                .onSuccess {
+                    entries = store.entries()
+                    message = "Encrypted file added. The original file was left unchanged."
+                }
+                .onFailure { message = "Could not encrypt this file. Check file access and free space." }
+        }
+    }
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        val id = exportingId
+        if (uri != null && id != null) {
+            val result = runCatching {
+                val temp = store.decryptToCache(id)
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        temp.inputStream().use { input -> input.copyTo(output) }
+                    } ?: error("Could not create destination file")
+                } finally { temp.delete() }
+            }
+            message = if (result.isSuccess) "Decrypted copy exported. Vault copy remains encrypted." else "Export failed. Please try again."
+        }
+        exportingId = null
+    }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(20.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("ENCRYPTED STORAGE", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+                Text("Your files, encrypted.", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Text("AES-256-GCM encryption with a non-exportable Android Keystore key. Original files are not removed.", color = SecondaryText, fontSize = 12.sp)
+                Button(onClick = { importPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) { Text("Add file to vault") }
+                Text(message, color = SecondaryText, fontSize = 12.sp)
+            }
+        }
+        if (entries.isEmpty()) item { Text("Your vault is empty.", color = SecondaryText) }
+        items(entries, key = { it.id }) { entry ->
+            Row(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(14.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Encrypted file", fontWeight = FontWeight.SemiBold)
+                    Text("${formatBytes(entry.encryptedBytes)} • ${entry.id.take(8)}", color = SecondaryText, fontSize = 11.sp)
+                }
+                TextButton(onClick = {
+                    exportingId = entry.id
+                    exportPicker.launch("nexora-export-${entry.id.take(8)}.bin")
+                }) { Text("Export") }
+                TextButton(onClick = {
+                    if (store.delete(entry.id)) {
+                        entries = store.entries()
+                        message = "Encrypted vault item deleted."
+                    } else message = "Could not delete this vault item."
+                }) { Text("Delete", color = Color(0xFFFF7777)) }
+            }
+        }
+        item {
+            Text("Security note: this version encrypts files at rest but does not yet require a separate PIN or biometric prompt to open the vault. Protect your device with Android screen lock.", color = SecondaryText, fontSize = 12.sp)
+        }
     }
 }
 
