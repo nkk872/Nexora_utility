@@ -184,17 +184,25 @@ private fun HomePage(cacheSize: Long, notice: String, open: (Page) -> Unit) {
 
 @Composable
 private fun CleanerPage(cacheSize: Long, notice: String, refresh: () -> Unit, clean: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(20.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("SAFE CLEANUP", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-            Spacer(Modifier.height(12.dp))
-            Text(formatBytes(cacheSize), fontSize = 34.sp, fontWeight = FontWeight.Bold)
-            Text("Estimated temporary cache owned by Nexora Utility", color = SecondaryText, fontSize = 13.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(formatBytes(cacheSize), fontSize = 36.sp, fontWeight = FontWeight.Bold)
+                    Text("Temporary Nexora cache", color = SecondaryText, fontSize = 13.sp)
+                }
+                Box(Modifier.size(72.dp).background(Accent.copy(alpha = .12f), RoundedCornerShape(22.dp)), contentAlignment = Alignment.Center) { Text("✦", color = Accent, fontSize = 36.sp) }
+            }
+            Text("Only files owned by Nexora are included in this estimate.", color = SecondaryText, fontSize = 12.sp)
         }
-        Button(onClick = refresh, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) { Text("Refresh scan") }
-        Button(onClick = clean, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) { Text("Clear Nexora cache") }
-        Text(notice, color = SecondaryText, fontSize = 13.sp)
-        Text("Android does not let ordinary apps silently clear other apps' caches. This cleaner only removes temporary files belonging to Nexora.", color = SecondaryText, fontSize = 13.sp)
+        Button(onClick = refresh, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B2B23), contentColor = Accent), contentPadding = PaddingValues(vertical = 13.dp)) { Text("Refresh scan") }
+        Button(onClick = clean, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background), contentPadding = PaddingValues(vertical = 14.dp)) { Text("Clean temporary files", fontWeight = FontWeight.SemiBold) }
+        Text(notice, color = Accent, fontSize = 12.sp)
+        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(16.dp)).padding(14.dp)) {
+            Text("Privacy protection", fontWeight = FontWeight.SemiBold)
+            Text("Android does not let ordinary apps silently clear other apps' caches. Nexora only removes its own temporary files.", color = SecondaryText, fontSize = 12.sp)
+        }
     }
 }
 
@@ -267,24 +275,26 @@ private fun StoragePage(activity: Activity) {
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(20.dp)) {
-                Text("INTERNAL STORAGE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                Spacer(Modifier.height(12.dp))
-                Text(if (total > 0) formatBytes(used) else "Unavailable", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                Text("Used of " + formatBytes(total) + " total", color = SecondaryText)
-                Spacer(Modifier.height(12.dp))
-                if (total > 0) LinearProgressIndicator(progress = { used.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(8.dp), color = Accent, trackColor = Color(0xFF29352F))
-                Spacer(Modifier.height(10.dp))
-                Text("Available: " + if (total > 0) formatBytes(free) else "Unavailable", color = SecondaryText, fontSize = 13.sp)
+            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("YOUR DEVICE STORAGE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Text(if (total > 0) formatBytes(used) else "Unavailable", fontSize = 34.sp, fontWeight = FontWeight.Bold)
+                Text("Used of " + formatBytes(total) + " total", color = SecondaryText, fontSize = 13.sp)
+                if (total > 0) {
+                    LinearProgressIndicator(progress = { used.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(9.dp), color = Accent, trackColor = Color(0xFF29352F))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Used " + ((used.toDouble() / total.toDouble()) * 100).toInt() + "%", color = Accent, fontSize = 12.sp)
+                        Text(formatBytes(free) + " free", color = SecondaryText, fontSize = 12.sp)
+                    }
+                }
             }
         }
         item {
-            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("LARGE FILE REVIEW", color = Accent, fontWeight = FontWeight.Bold)
-                Text("Choose a folder. Nexora reviews image/video files plus files 20 MB or larger. Nothing is deleted until you select items and confirm.", color = SecondaryText, fontSize = 12.sp)
-                Button(onClick = { picker.launch(null) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) { Text("Choose folder to scan") }
-                Text(folderLabel, color = SecondaryText, fontSize = 12.sp)
-                Text(scanMessage, color = SecondaryText, fontSize = 12.sp)
+            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(20.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("FIND SPACE-HOGGING FILES", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
+                Text("Review photos, videos and files larger than 20 MB. You stay in control of every deletion.", color = SecondaryText, fontSize = 12.sp)
+                Button(onClick = { picker.launch(null) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background), contentPadding = PaddingValues(vertical = 12.dp)) { Text("Choose folder to scan") }
+                Text(folderLabel, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text(scanMessage, color = SecondaryText, fontSize = 11.sp)
             }
         }
         if (files.isNotEmpty()) {
@@ -396,11 +406,12 @@ private fun VaultPage(activity: Activity) {
 
     if (!unlocked) {
         Column(
-            Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(20.dp),
+            Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(24.dp)).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("PRIVATE VAULT LOCKED", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
-            Text("Your files stay private.", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            Box(Modifier.size(58.dp).background(Accent.copy(alpha = .12f), RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) { Text("▣", color = Accent, fontSize = 28.sp) }
+            Text("PRIVATE VAULT", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+            Text("A private space for your files.", fontSize = 23.sp, fontWeight = FontWeight.Bold)
             Text("Unlock with your Android biometric or device screen-lock credential before viewing, exporting or deleting vault files.", color = SecondaryText, fontSize = 13.sp)
             Button(
                 onClick = {
@@ -599,11 +610,11 @@ private fun NexoraVpnPage(activity: Activity) {
     ) {
         item {
             Column(
-                Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                Text("NEXORA VPN • VPN GATE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                Text("Explore free VPN locations", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Text("PRIVATE CONNECTION", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Text("Choose your VPN route", fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text("Live directory of volunteer-operated OpenVPN relays. Countries and servers appear only when the provider currently lists them.", color = SecondaryText, fontSize = 12.sp)
                 Text("OpenVPN engine: $engineStatus", color = if (engineStatus == "CONNECTED") Accent else SecondaryText, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 Text(engineMessage, color = SecondaryText, fontSize = 11.sp)
