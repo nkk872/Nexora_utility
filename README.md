@@ -3,10 +3,13 @@
 Native Android utility app built with Kotlin and Jetpack Compose.
 
 ## Current implementation
-- Dark black / emerald-green interface with Home, Clean, Storage and Tools sections.
+- Dark black / emerald-green interface with Home, Clean, Storage, Vault and Tools sections.
 - Safe cache estimate and explicit clearing of Nexora Utility's own cache only.
 - Internal shared data-partition usage and available-space display using Android filesystem statistics.
-- User-selected large-file review, explicit delete confirmation and bounded exact SHA-256 duplicate grouping.\n- Encrypted private vault using Android Keystore AES-256-GCM with import/export; separate PIN/biometric gate is still pending.\n- Basic device diagnostics for Android version, available RAM, battery percentage and thermal status.\n- Shortcuts to Android system settings for app, network, display, battery and sound controls.
+- User-selected large-file review, explicit delete confirmation and bounded exact SHA-256 duplicate grouping.
+- Encrypted private vault using Android Keystore AES-256-GCM with import/export; separate PIN/biometric gate is still pending.
+- Basic device diagnostics for Android version, available RAM, battery percentage and thermal status.
+- Shortcuts to Android system settings for app, network, display, battery and sound controls.
 - Minimal manifest and least-privilege baseline; no broad storage, overlay, accessibility or package-visibility permissions are requested by this foundation.
 
 ## Product scope and release gates
@@ -24,4 +27,4 @@ Free to use. The only permitted advertising placement is one anchored adaptive b
 - JDK: 17
 - Gradle: 8.9 (CI generates the wrapper if absent)
 
-The GitHub Actions workflow compiles Kotlin, runs lint and tests, and assembles a debug APK. A successful CI run and physical-device QA are required before calling this release-ready.
+GitHub Actions CI is being added to compile Kotlin, run lint and unit tests, and assemble a debug APK. A successful CI run and physical-device QA are required before calling this release-ready.
