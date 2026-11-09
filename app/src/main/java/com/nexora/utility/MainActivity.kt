@@ -1,6 +1,8 @@
 package com.nexora.utility
 
 import android.app.Activity
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.content.Intent
 import android.os.Bundle
 import android.os.Environment
@@ -35,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -376,6 +379,9 @@ private fun VaultPage(activity: Activity) {
     var documentPickerInProgress by remember { mutableStateOf(false) }
     var renamingEntry by remember { mutableStateOf<VaultStore.Entry?>(null) }
     var renameText by remember { mutableStateOf("") }
+    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var previewName by remember { mutableStateOf("") }
+    var previewLoading by remember { mutableStateOf(false) }
 
     DisposableEffect(activity) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -479,6 +485,29 @@ private fun VaultPage(activity: Activity) {
         return
     }
 
+    if (previewLoading) {
+        AlertDialog(
+            onDismissRequest = { previewLoading = false },
+            title = { Text("Preparing preview") },
+            text = { Text("Decrypting the image temporarily in app-private cache…") },
+            confirmButton = { TextButton(onClick = { previewLoading = false }) { Text("Close") } }
+        )
+    }
+    previewBitmap?.let { bitmap ->
+        AlertDialog(
+            onDismissRequest = { previewBitmap = null },
+            title = { Text(previewName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            text = {
+                androidx.compose.foundation.Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = previewName,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)
+                )
+            },
+            confirmButton = { TextButton(onClick = { previewBitmap = null }) { Text("Close", color = Accent) } }
+        )
+    }
+
     if (renamingEntry != null) {
         AlertDialog(
             onDismissRequest = { renamingEntry = null },
@@ -519,6 +548,39 @@ private fun VaultPage(activity: Activity) {
                 Column(Modifier.weight(1f)) {
                     Text(entry.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                     Text("${formatBytes(entry.encryptedBytes)} • ${entry.mimeType ?: "File"}", color = SecondaryText, fontSize = 11.sp)
+                }
+                if (entry.mimeType?.startsWith("image/") == true) {
+                    TextButton(onClick = {
+                        if (entry.encryptedBytes > 25L * 1024L * 1024L) {
+                            message = "Image is too large for an in-app preview. Export it to view safely."
+                        } else {
+                            previewLoading = true
+                            Thread {
+                                val decoded = runCatching {
+                                    val temp = store.decryptToCache(entry.id)
+                                    try {
+                                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                                        BitmapFactory.decodeFile(temp.absolutePath, bounds)
+                                        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Unsupported image" }
+                                        var sample = 1
+                                        while (bounds.outWidth / sample > 1800 || bounds.outHeight / sample > 1800) sample *= 2
+                                        BitmapFactory.decodeFile(temp.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+                                            ?: error("Could not decode image")
+                                    } finally { temp.delete() }
+                                }
+                                activity.runOnUiThread {
+                                    previewLoading = false
+                                    decoded.onSuccess {
+                                        previewName = entry.displayName
+                                        previewBitmap = it
+                                        message = "Image preview ready. Temporary decrypted file was removed."
+                                    }.onFailure {
+                                        message = "Preview unavailable. The encrypted original remains safe."
+                                    }
+                                }
+                            }.start()
+                        }
+                    }) { Text("Preview", color = Accent) }
                 }
                 TextButton(onClick = { renamingEntry = entry; renameText = entry.displayName }) { Text("Rename", color = Accent) }
                 TextButton(onClick = {
