@@ -280,6 +280,20 @@ private fun StoragePage(activity: Activity) {
     var duplicateMessage by remember { mutableStateOf("Duplicate scan checks exact file contents, not similar photos.") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var scanMessage by remember { mutableStateOf("Choose a folder to review photos, videos and large files. Nothing is deleted automatically.") }
+    var fileFilter by remember { mutableStateOf("All") }
+    val visibleFiles = remember(files, fileFilter) {
+        files.filter { file ->
+            when (fileFilter) {
+                "Images" -> file.mimeType?.startsWith("image/") == true
+                "Videos" -> file.mimeType?.startsWith("video/") == true
+                "Large" -> file.size >= 20L * 1024L * 1024L
+                else -> true
+            }
+        }
+    }
+    val imageCount = files.count { it.mimeType?.startsWith("image/") == true }
+    val videoCount = files.count { it.mimeType?.startsWith("video/") == true }
+    val largeCount = files.count { it.size >= 20L * 1024L * 1024L }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             scanMessage = "Scanning selected folder in the background…"
@@ -378,7 +392,21 @@ private fun StoragePage(activity: Activity) {
         }
         if (files.isNotEmpty()) {
             item {
-                Text("Photos, videos and large files (${files.size})", fontWeight = FontWeight.Bold)
+                Text("Storage results (${files.size})", fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MetricCard("Images", imageCount.toString(), Modifier.weight(1f))
+                    MetricCard("Videos", videoCount.toString(), Modifier.weight(1f))
+                    MetricCard("20 MB+", largeCount.toString(), Modifier.weight(1f))
+                }
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    listOf("All", "Images", "Videos", "Large").forEachIndexed { index, label ->
+                        SegmentedButton(
+                            selected = fileFilter == label,
+                            onClick = { fileFilter = label },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = 4)
+                        ) { Text(label, fontSize = 11.sp) }
+                    }
+                }
                 Button(onClick = {
                     val candidates = files.map { DuplicateScanner.Candidate(it.uri, it.name, it.size) }
                     duplicateMessage = "Checking file contents…"
@@ -396,7 +424,7 @@ private fun StoragePage(activity: Activity) {
                 }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) { Text("Find exact photo, video and file duplicates") }
                 Text(duplicateMessage, color = SecondaryText, fontSize = 11.sp)
             }
-            items(files, key = { it.uri.toString() }) { file ->
+            items(visibleFiles, key = { it.uri.toString() }) { file ->
                 Row(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(14.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = selected.contains(file.uri.toString()), onCheckedChange = { checked ->
                         selected = if (checked) selected + file.uri.toString() else selected - file.uri.toString()
@@ -422,7 +450,7 @@ private fun StoragePage(activity: Activity) {
                 }
             }
         }
-        item { Text("The scan only accesses the folder you explicitly select through Android's system file picker. It reviews up to 5,000 entries and shows up to 500 media/large-file matches. Exact duplicate checks are content-based, bounded to the displayed list and files up to 250 MB each; similar-looking photos are not matched.", color = SecondaryText, fontSize = 12.sp) }
+        item { Text("The scan only accesses the folder you explicitly select through Android's system file picker. Category counts can overlap: a large image appears in both Images and 20 MB+. Filters only change the list view; they do not change which files are selected for deletion. Exact duplicate checks are content-based, bounded to the displayed list and files up to 250 MB each; similar-looking photos are not matched.", color = SecondaryText, fontSize = 12.sp) }
     }
 }
 
