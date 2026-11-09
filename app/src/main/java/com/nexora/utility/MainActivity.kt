@@ -93,7 +93,7 @@ private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
                         )
                     }
                 }
-                if (adsAllowed && page != Page.VAULT) AnchoredBannerAd()
+                if (adsAllowed && BuildConfig.ADMOB_BANNER_UNIT_ID.isNotBlank() && page != Page.VAULT) AnchoredBannerAd()
             }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
