@@ -285,6 +285,10 @@ private fun StoragePage(activity: Activity) {
                         Text("Used " + ((used.toDouble() / total.toDouble()) * 100).toInt() + "%", color = Accent, fontSize = 12.sp)
                         Text(formatBytes(free) + " free", color = SecondaryText, fontSize = 12.sp)
                     }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        MetricCard("Used space", formatBytes(used), Modifier.weight(1f))
+                        MetricCard("Available", formatBytes(free), Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -594,13 +598,13 @@ private fun NexoraVpnPage(activity: Activity) {
     LaunchedEffect(Unit) { loadServers() }
 
     val filtered = remember(servers, query) {
-        if (query.isBlank()) servers
-        else servers.filter {
+        val matching = if (query.isBlank()) servers else servers.filter {
             it.countryLong.contains(query, ignoreCase = true) ||
                 it.countryShort.contains(query, ignoreCase = true) ||
                 it.ip.contains(query, ignoreCase = true) ||
                 it.hostName.contains(query, ignoreCase = true)
         }
+        matching.sortedBy { it.pingMs }
     }
 
     LazyColumn(
