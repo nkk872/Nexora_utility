@@ -13,6 +13,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
 import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -362,6 +364,54 @@ private fun isVpnActive(activity: Activity): Boolean = runCatching {
     val network = manager.activeNetwork ?: return@runCatching false
     manager.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
 }.getOrDefault(false)
+
+
+@Composable
+private fun ProtonVpnPage(activity: Activity) {
+    val context = LocalContext.current
+    val packageName = "ch.protonvpn.android"
+    val protonInstalled = remember {
+        runCatching { activity.packageManager.getPackageInfo(packageName, 0) }.isSuccess
+    }
+    var refreshKey by remember { mutableIntStateOf(0) }
+    val vpnActive = remember(refreshKey) {
+        val manager = activity.getSystemService(ConnectivityManager::class.java)
+        manager?.allNetworks?.any { network ->
+            manager.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+        } == true
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text("PROTON VPN", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Text("Private connection, powered by Proton.", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("Nexora uses the official Proton VPN Android app to create and manage the encrypted tunnel. Your Proton account and VPN credentials stay inside Proton's app.", color = SecondaryText, fontSize = 13.sp)
+            Text(if (vpnActive) "Android reports an active VPN connection" else "No active VPN connection detected", color = if (vpnActive) Accent else SecondaryText, fontWeight = FontWeight.SemiBold)
+            Text("This is device-wide VPN status. Android does not disclose the VPN provider identity to Nexora, so this status alone cannot prove the connection is Proton.", color = SecondaryText, fontSize = 11.sp)
+        }
+        Button(onClick = {
+            val launch = activity.packageManager.getLaunchIntentForPackage(packageName)
+            if (launch != null) activity.startActivity(launch)
+            else activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
+        }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
+            Text(if (protonInstalled) "Open Proton VPN" else "Install Proton VPN")
+        }
+        Button(onClick = {
+            runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://account.protonvpn.com/downloads"))) }
+        }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
+            Text("Proton configuration and downloads")
+        }
+        Button(onClick = {
+            runCatching { activity.startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
+        }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
+            Text("Android VPN settings")
+        }
+        Button(onClick = { refreshKey++ }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
+            Text("Refresh VPN status")
+        }
+        Text("Setup: install/open Proton VPN, sign in there, choose a server and tap Connect. Approve Android's VPN connection prompt. Keep Proton VPN installed; Nexora does not store your Proton password or private keys.", color = SecondaryText, fontSize = 12.sp)
+        Text("Provider features such as kill switch, NetShield, Secure Core and protocol selection remain controlled by the official Proton VPN app. Nexora does not claim to control these features.", color = SecondaryText, fontSize = 12.sp)
+    }
+}
 
 @Composable
 private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
