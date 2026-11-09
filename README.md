@@ -10,6 +10,7 @@ Native Android utility app built with Kotlin and Jetpack Compose.
 - Encrypted private vault using Android Keystore AES-256-GCM with import/export; separate PIN/biometric gate is still pending.
 - Basic device diagnostics for Android version, available RAM, battery percentage and thermal status.
 - Shortcuts to Android system settings for app, network, display, battery and sound controls.
+- Provider-neutral VPN setup screen opens Android's VPN settings and detects whether the active network uses Android VPN transport; no provider, tunnel, server, or privacy verification is bundled.
 - Minimal manifest and least-privilege baseline; no broad storage, overlay, accessibility or package-visibility permissions are requested by this foundation.
 
 ## Product scope and release gates
