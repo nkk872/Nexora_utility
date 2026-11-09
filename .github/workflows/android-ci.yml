@@ -101,6 +101,9 @@ jobs:
       - name: Build release APK (unsigned unless signing secrets are configured)
         run: ./gradlew --no-daemon --stacktrace :app:assembleRelease
 
+      - name: Build release Android App Bundle (unsigned unless signing secrets are configured)
+        run: ./gradlew --no-daemon --stacktrace :app:bundleRelease
+
       - name: Upload APK outputs
         uses: actions/upload-artifact@v4
         with:
@@ -108,5 +111,6 @@ jobs:
           path: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
