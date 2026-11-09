@@ -39,6 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val Background = Color(0xFF080D0B)
 private val SurfaceDark = Color(0xFF121B17)
@@ -341,108 +344,108 @@ private fun VaultPage(activity: Activity) {
 
 @Composable
 private fun NexoraVpnPage(activity: Activity) {
-    val context = LocalContext.current
-    val vault = remember { VaultStore(context) }
-    val preferences = remember { context.getSharedPreferences("nexora_vpn", 0) }
-    var profileId by remember { mutableStateOf(preferences.getString("wireguard_profile_id", null)) }
-    var status by remember { mutableStateOf(WireGuardRuntime.state.name) }
-    var message by remember { mutableStateOf("Import a WireGuard .conf profile to configure your own VPN connection.") }
-    var busy by remember { mutableStateOf(false) }
-    val importPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching {
-                val entry = vault.encrypt(uri)
-                preferences.edit().putString("wireguard_profile_id", entry.id).apply()
-                profileId = entry.id
-                message = "WireGuard profile encrypted and saved on this device."
-            }.onFailure { message = "Could not securely import this profile. Please try again." }
-        }
-    }
-    val connectNow: () -> Unit = {
-        val id = profileId
-        if (id == null) {
-            message = "Import a WireGuard profile first."
-        } else {
-            busy = true
-            message = "Starting WireGuard tunnel…"
-            Thread {
-                val result = runCatching {
-                    val temp = vault.decryptToCache(id)
-                    try {
-                        val config = FileInputStream(temp).use { Config.parse(it) }
-                        WireGuardRuntime.connect(context, config)
-                    } finally { temp.delete() }
-                }
-                activity.runOnUiThread {
-                    busy = false
-                    status = WireGuardRuntime.state.name
-                    message = result.fold(
-                        { "WireGuard engine started. A peer handshake is still required before traffic is confirmed." },
-                        { "Connection failed: " + (it.message ?: "Check the profile and server endpoint.") }
-                    )
-                }
-            }.start()
-        }
-    }
-    val permissionLauncher = rememberLauncherForActivityResult(StartActivityForResult()) { result ->
-        if (result.resultCode == RESULT_OK) connectNow()
-        else message = "Android VPN permission was not granted."
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text("NEXORA VPN • WIREGUARD", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-            Text(if (status == "UP") "Tunnel engine running" else "Your private VPN", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text("Open-source WireGuard tunnel engine embedded inside Nexora. Your profile is encrypted at rest using Android Keystore.", color = SecondaryText, fontSize = 13.sp)
-            Text("Engine state: $status", color = if (status == "UP") Accent else SecondaryText, fontWeight = FontWeight.SemiBold)
-        }
-        Button(onClick = { importPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
-            Text(if (profileId == null) "Import WireGuard profile (.conf)" else "Replace WireGuard profile")
-        }
-        Text(if (profileId == null) "No profile imported" else "Encrypted WireGuard profile saved on this device", color = SecondaryText, fontSize = 12.sp)
-        Button(onClick = {
-            val permission = VpnService.prepare(activity)
-            if (permission != null) permissionLauncher.launch(permission) else connectNow()
-        }, enabled = !busy && profileId != null && status != "UP", modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
-            Text(if (busy) "Connecting…" else "Connect VPN")
-        }
-        Button(onClick = {
-            busy = true
-            Thread {
-                val result = runCatching { WireGuardRuntime.disconnect() }
-                activity.runOnUiThread {
-                    busy = false
-                    status = WireGuardRuntime.state.name
-                    message = if (result.isSuccess) "Tunnel stopped." else "Could not stop tunnel: " + (result.exceptionOrNull()?.message ?: "unknown error")
-                }
-            }.start()
-        }, enabled = !busy && status == "UP", modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) {
-            Text("Disconnect")
-        }
-        Text(message, color = SecondaryText, fontSize = 12.sp)
-        Text("Important: Nexora is now a WireGuard VPN client, not a VPN server/provider. A valid .conf profile must point to a reachable WireGuard server that you own or have permission to use. The app cannot create internet egress servers or supply free VPN locations by itself.", color = SecondaryText, fontSize = 12.sp)
-        Text("A running engine does not prove the server handshake or leak protection. Verify the peer handshake, public IP, IPv4/IPv6 and DNS routing on a real device before release.", color = SecondaryText, fontSize = 12.sp)
-    }
-}
+    var servers by remember { mutableStateOf<List<VpnGateServer>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf<String?>(null) }
+    var message by remember { mutableStateOf("Loading live volunteer VPN relays…") }
 
-private object WireGuardRuntime {
-    @Volatile var state: State = State.DOWN
-        private set
-    @Volatile private var backend: GoBackend? = null
-    private val tunnel = object : Tunnel {
-        override fun getName(): String = "Nexora"
-        override fun onStateChange(newState: State) { state = newState }
+    val loadServers: () -> Unit = {
+        if (!loading) {
+            loading = true
+            message = "Refreshing VPN Gate server directory…"
+            Thread {
+                val result = runCatching { VpnGateRepository.fetchServers() }
+                activity.runOnUiThread {
+                    loading = false
+                    result.onSuccess { list ->
+                        servers = list
+                        message = if (list.isEmpty()) "No OpenVPN relays were returned. Try refreshing later."
+                            else "Updated live directory: ${list.size} OpenVPN profiles found."
+                    }.onFailure {
+                        message = "Could not load the live directory. Check your internet connection and try again."
+                    }
+                }
+            }.start()
+        }
     }
-    @Synchronized
-    fun connect(context: android.content.Context, config: Config) {
-        val engine = backend ?: GoBackend(context.applicationContext).also { backend = it }
-        engine.setState(tunnel, State.UP, config)
-        state = engine.getState(tunnel)
+
+    LaunchedEffect(Unit) { loadServers() }
+
+    val filtered = remember(servers, query) {
+        if (query.isBlank()) servers
+        else servers.filter {
+            it.countryLong.contains(query, ignoreCase = true) ||
+                it.countryShort.contains(query, ignoreCase = true) ||
+                it.ip.contains(query, ignoreCase = true) ||
+                it.hostName.contains(query, ignoreCase = true)
+        }
     }
-    @Synchronized
-    fun disconnect() {
-        val engine = backend ?: return
-        engine.setState(tunnel, State.DOWN, null)
-        state = engine.getState(tunnel)
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        item {
+            Column(
+                Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("NEXORA VPN • VPN GATE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Text("Explore free VPN locations", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Text("Live directory of volunteer-operated OpenVPN relays. Countries and servers appear only when the provider currently lists them.", color = SecondaryText, fontSize = 12.sp)
+                Text(message, color = SecondaryText, fontSize = 12.sp)
+                Button(onClick = loadServers, enabled = !loading, modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
+                    Text(if (loading) "Refreshing…" else "Refresh server list")
+                }
+            }
+        }
+        item {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Search country or server") },
+                placeholder = { Text("e.g. Japan, India, 1.2.3.4") }
+            )
+            Text("${filtered.size} servers • ${servers.map { it.countryShort }.distinct().size} countries", color = SecondaryText, fontSize = 12.sp)
+        }
+        if (filtered.isEmpty() && !loading) {
+            item { Text("No matching servers. Try another country or refresh the list.", color = SecondaryText) }
+        }
+        items(filtered, key = { it.hostName + it.ip }) { server ->
+            Column(
+                Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(16.dp)).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(server.countryLong, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Text("${server.hostName} • ${server.ip}", color = SecondaryText, fontSize = 11.sp)
+                    }
+                    Text(server.countryShort, color = Accent, fontWeight = FontWeight.Bold)
+                }
+                Text("Ping ${server.pingMs} ms  •  ${server.speedMbps} Mbps  •  ${server.sessions} sessions", color = SecondaryText, fontSize = 12.sp)
+                Text(if (selected == server.hostName) "Selected" else "OpenVPN profile available", color = if (selected == server.hostName) Accent else SecondaryText, fontSize = 11.sp)
+                Button(
+                    onClick = {
+                        selected = server.hostName
+                        message = "${server.countryLong} selected. OpenVPN profile is available; the in-app OpenVPN connection engine is the next integration step."
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (selected == server.hostName) Accent else Color(0xFF25352D), contentColor = if (selected == server.hostName) Background else Color.White)
+                ) { Text(if (selected == server.hostName) "Selected server" else "Select location") }
+            }
+        }
+        item {
+            Text(
+                "Important safety note: these are public volunteer relays, not a managed commercial VPN. Operators may observe connection metadata and traffic that is not protected by HTTPS. Availability, speed and privacy are not guaranteed. Avoid banking or sensitive activity on these servers.",
+                color = SecondaryText, fontSize = 12.sp
+            )
+        }
     }
 }
 
