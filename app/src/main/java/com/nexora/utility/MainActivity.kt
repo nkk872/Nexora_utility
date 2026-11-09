@@ -235,7 +235,8 @@ private fun CleanerPage(activity: Activity, cacheSize: Long, notice: String, ref
                         localMessage = "Scan complete."
                     }
                 } else {
-                    localMessage = if (cancelFlag.get()) "Operation cancelled. No files outside the cleaner folder were touched." else "Could not complete this operation. Try again."
+                    if (cleanFiles) clean(0L)
+                    localMessage = if (cancelFlag.get()) "Cleanup cancelled. Completed deletions are reflected above; remaining files are safe." else "Could not complete this operation. Try again."
                 }
             }
         }.start()
