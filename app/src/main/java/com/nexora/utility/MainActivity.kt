@@ -187,10 +187,12 @@ private fun StoragePage(activity: Activity) {
                 var visited = 0
                 fun walk(dir: DocumentFile) {
                     if (visited >= 5000) return
-                    dir.listFiles().forEach { item ->
+                    for (item in dir.listFiles()) {
+                        if (visited >= 5000) break
                         visited++
-                        if (item.isDirectory) walk(item)
-                        else if (item.isFile) {
+                        if (item.isDirectory) {
+                            walk(item)
+                        } else if (item.isFile) {
                             val size = item.length()
                             val mime = item.type
                             val isMedia = mime?.startsWith("image/") == true || mime?.startsWith("video/") == true
@@ -258,11 +260,19 @@ private fun StoragePage(activity: Activity) {
             item {
                 Text("Photos, videos and large files (${files.size})", fontWeight = FontWeight.Bold)
                 Button(onClick = {
-                    duplicateGroups = DuplicateScanner.findDuplicates(
-                        activity.contentResolver,
-                        files.map { DuplicateScanner.Candidate(it.uri, it.name, it.size) }
-                    )
-                    duplicateMessage = "Checked ${files.size} listed large files. Exact matches are grouped below."
+                    val candidates = files.map { DuplicateScanner.Candidate(it.uri, it.name, it.size) }
+                    duplicateMessage = "Checking file contents…"
+                    Thread {
+                        val result = runCatching { DuplicateScanner.findDuplicates(activity.contentResolver, candidates) }
+                        activity.runOnUiThread {
+                            result.onSuccess {
+                                duplicateGroups = it
+                                duplicateMessage = "Checked ${candidates.size} listed files. Exact matches are grouped below."
+                            }.onFailure {
+                                duplicateMessage = "Duplicate scan could not finish. Check file access and try again."
+                            }
+                        }
+                    }.start()
                 }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Accent)) { Text("Find exact photo, video and file duplicates") }
                 Text(duplicateMessage, color = SecondaryText, fontSize = 11.sp)
             }
@@ -302,10 +312,23 @@ private fun VaultPage(activity: Activity) {
     val context = LocalContext.current
     val fragmentActivity = activity as? androidx.fragment.app.FragmentActivity
     val store = remember { VaultStore(context) }
-    var entries by remember { mutableStateOf(store.entries()) }
+    var entries by remember { mutableStateOf(emptyList<VaultStore.Entry>()) }
     var message by remember { mutableStateOf("Unlock with your device biometric or screen-lock credential to access your encrypted vault.") }
     var unlocked by remember { mutableStateOf(false) }
     var exportingId by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(activity) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                unlocked = false
+                entries = emptyList()
+                exportingId = null
+                message = "Vault locked automatically when Nexora went into the background."
+            }
+        }
+        activity.lifecycle.addObserver(observer)
+        onDispose { activity.lifecycle.removeObserver(observer) }
+    }
     val authenticators = androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or
         androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
     val biometricManager = remember(context) { androidx.biometric.BiometricManager.from(context) }
