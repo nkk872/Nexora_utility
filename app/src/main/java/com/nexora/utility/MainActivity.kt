@@ -389,6 +389,8 @@ private fun VaultPage(activity: Activity) {
                 unlocked = false
                 entries = emptyList()
                 exportingId = null
+                previewBitmap = null
+                previewLoading = false
                 message = "Vault locked automatically when Nexora went into the background."
             }
         }
@@ -570,6 +572,7 @@ private fun VaultPage(activity: Activity) {
                                 }
                                 activity.runOnUiThread {
                                     previewLoading = false
+                                    if (!unlocked) return@runOnUiThread
                                     decoded.onSuccess {
                                         previewName = entry.displayName
                                         previewBitmap = it
