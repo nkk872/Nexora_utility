@@ -41,4 +41,4 @@ Do not enable live ads until the publisher has supplied the real AdMob App ID an
 
 ## Current implementation state
 
-**Not implemented or verified in the repository yet.** The repository currently lacks the Gradle project files and Kotlin source tree needed to add the SDK and Compose banner component. This document records the approved product requirement; it is not evidence that ads are integrated.
+**Not implemented or verified in the repository yet.** The native Gradle project and Kotlin source tree now exist, but no AdMob App ID or production banner unit ID has been supplied. UMP consent, privacy policy, Data safety declarations and banner QA remain release gates. This document records the approved product requirement; it is not evidence that ads are integrated.
