@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.StatFs
 import android.provider.Settings
-import androidx.activity.ComponentActivity
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,6 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
+import com.google.android.gms.ads.MobileAds
+import com.google.android.ump.ConsentInformation
+import com.google.android.ump.ConsentRequestParameters
+import com.google.android.ump.UserMessagingPlatform
 
 private val Background = Color(0xFF080D0B)
 private val SurfaceDark = Color(0xFF121B17)
@@ -48,14 +51,28 @@ private val SecondaryText = Color(0xFFA2B2A9)
 private enum class Page { HOME, CLEANER, STORAGE, VAULT, VPN, TOOLS }
 
 class MainActivity : FragmentActivity() {
+    private val adsAllowed = mutableStateOf(false)
+    private var adsInitializationStarted = false
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { NexoraApp(this) }
+        setContent { NexoraApp(this, adsAllowed.value) }
+        val consentInformation = UserMessagingPlatform.getConsentInformation(this)
+        val requestParameters = ConsentRequestParameters.Builder().build()
+        consentInformation.requestConsentInfoUpdate(this, requestParameters,
+            { UserMessagingPlatform.loadAndShowConsentFormIfRequired(this) { initializeAdsIfAllowed(consentInformation) } },
+            { initializeAdsIfAllowed(consentInformation) }
+        )
+    }
+    private fun initializeAdsIfAllowed(consentInformation: ConsentInformation) {
+        if (consentInformation.canRequestAds() && !adsInitializationStarted) {
+            adsInitializationStarted = true
+            MobileAds.initialize(this) { runOnUiThread { adsAllowed.value = true } }
+        }
     }
 }
 
 @Composable
-private fun NexoraApp(activity: Activity) {
+private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
     var page by remember { mutableStateOf(Page.HOME) }
     var cacheSize by remember { mutableLongStateOf(readCacheSize(activity)) }
     var notice by remember { mutableStateOf("Your device, made simpler.") }
