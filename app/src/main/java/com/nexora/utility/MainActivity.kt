@@ -21,13 +21,6 @@ import com.wireguard.android.backend.Tunnel
 import com.wireguard.android.backend.Tunnel.State
 import com.wireguard.config.Config
 import java.io.FileInputStream
-import android.app.Activity.RESULT_OK
-import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
-import com.wireguard.android.backend.GoBackend
-import com.wireguard.android.backend.Tunnel
-import com.wireguard.android.backend.Tunnel.State
-import com.wireguard.config.Config
-import java.io.FileInputStream
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
