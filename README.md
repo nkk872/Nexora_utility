@@ -7,7 +7,7 @@ Native Android utility app built with Kotlin and Jetpack Compose.
 - Safe cache estimate and explicit clearing of Nexora Utility's own cache only.
 - Internal shared data-partition usage and available-space display using Android filesystem statistics.
 - User-selected large-file review, explicit delete confirmation and bounded exact SHA-256 duplicate grouping.
-- Encrypted private vault using Android Keystore AES-256-GCM with import/export; separate PIN/biometric gate is still pending.
+- Encrypted private vault using Android Keystore AES-256-GCM with import/export; vault access now requires Android strong biometric or device screen-lock authentication.
 - Basic device diagnostics for Android version, available RAM, battery percentage and thermal status.
 - Built-in WireGuard client for user-provided WireGuard server profiles.
 - Live VPN Gate country/server directory with encrypted OpenVPN profile storage. Nexora can request connect/disconnect and display status through the documented AIDL API of the separately installed OpenVPN for Android app; that companion app supplies the OpenVPN tunnel engine. VPN Gate relays are volunteer-operated and availability changes.
@@ -15,12 +15,12 @@ Native Android utility app built with Kotlin and Jetpack Compose.
 - Minimal manifest and least-privilege baseline; no broad storage, overlay or accessibility permissions are requested. Network access is used for the VPN Gate directory and VPN client integrations.
 
 ## Product scope and release gates
-Planned next modules: broader media analysis, separate vault PIN/biometric gate, compliant app-management tools, game diagnostics and release QA. WireGuard requires a valid user profile and reachable WireGuard server. VPN Gate OpenVPN connections require the separate OpenVPN for Android companion app; Nexora does not operate its own VPN server fleet. VPN Gate server availability, throughput and privacy are not guaranteed.
+Remaining release gates: device testing of biometric vault unlock and VPN tunnel routing; broader opt-in media review; supported app-management shortcuts; game-focused device diagnostics; AdMob configuration and consent; signing and Play Console review. WireGuard requires a valid user profile and reachable WireGuard server. VPN Gate OpenVPN connections require the separate OpenVPN for Android companion app; Nexora does not operate its own VPN server fleet. VPN Gate server availability, throughput and privacy are not guaranteed.
 
 Features are not described as active until implemented and tested. Android does not allow an ordinary third-party app to silently clear other apps' caches, hide arbitrary apps, or boost CPU/GPU performance. Nexora will use supported APIs and disclose these limitations.
 
 ## Monetization
-Free to use. The only permitted advertising placement is one anchored adaptive banner at the bottom. No subscriptions, premium tier, paid unlocks, credits, interstitials, rewarded ads, app-open ads, pop-ups or full-screen ads. Live ads remain disabled until real AdMob identifiers, consent, privacy disclosures and QA are complete. See [ad requirements](docs/ADS_AND_MONETIZATION_REQUIREMENTS.md).
+Free to use. The only permitted advertising placement is one anchored adaptive banner at the bottom. No subscriptions, premium tier, paid unlocks, credits, interstitials, rewarded ads, app-open ads, pop-ups or full-screen ads. Live ads remain disabled until the owner supplies real AdMob App ID and banner unit ID, consent/privacy disclosures are finalized, and QA is complete. See [ad requirements](docs/ADS_AND_MONETIZATION_REQUIREMENTS.md).
 
 ## Build
 - Application ID: `com.nexora.utility`
