@@ -25,7 +25,7 @@ fun AnchoredBannerAd(modifier: Modifier = Modifier) {
         val widthDp = maxWidth.value.toInt().coerceAtLeast(1)
         val adView = remember(context, widthDp) {
             AdView(context).apply {
-                adUnitId = TEST_BANNER_UNIT_ID
+                adUnitId = BuildConfig.ADMOB_BANNER_UNIT_ID
                 setAdSize(AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, widthDp))
             }
         }
@@ -42,4 +42,3 @@ fun AnchoredBannerAd(modifier: Modifier = Modifier) {
     }
 }
 
-private const val TEST_BANNER_UNIT_ID = "ca-app-pub-3940256099942544/9214589741"
