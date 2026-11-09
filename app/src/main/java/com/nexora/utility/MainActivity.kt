@@ -462,11 +462,37 @@ private fun StoragePage(activity: Activity) {
                 }
             }
             if (duplicateGroups.isNotEmpty()) {
-                item { Text("Exact duplicate groups (${duplicateGroups.size})", fontWeight = FontWeight.Bold) }
+                item {
+                    Text("Exact duplicate groups (${duplicateGroups.size})", fontWeight = FontWeight.Bold)
+                    Text("Choose which copies to remove. The first item in each group is left unselected as a suggested copy to keep.", color = SecondaryText, fontSize = 11.sp)
+                    OutlinedButton(
+                        onClick = {
+                            val extras = duplicateGroups.flatMap { group ->
+                                group.items.drop(1).map { it.uri.toString() }
+                            }.toSet()
+                            selected = selected + extras
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Select extra copies (keep one per group)") }
+                }
                 items(duplicateGroups, key = { it.sha256 }) { group ->
-                    Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(14.dp)).padding(12.dp)) {
-                        Text("${group.items.size} identical files", color = Accent, fontWeight = FontWeight.SemiBold)
-                        group.items.forEach { Text(it.displayName, color = SecondaryText, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(14.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("${group.items.size} identical files • ${formatBytes(group.items.firstOrNull()?.sizeBytes ?: 0L)} each", color = Accent, fontWeight = FontWeight.SemiBold)
+                        group.items.forEachIndexed { index, candidate ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = selected.contains(candidate.uri.toString()),
+                                    onCheckedChange = { checked ->
+                                        selected = if (checked) selected + candidate.uri.toString()
+                                            else selected - candidate.uri.toString()
+                                    }
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    Text(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
+                                    Text(if (index == 0) "Suggested copy to keep" else "Duplicate copy", color = SecondaryText, fontSize = 10.sp)
+                                }
+                            }
+                        }
                     }
                 }
             }
