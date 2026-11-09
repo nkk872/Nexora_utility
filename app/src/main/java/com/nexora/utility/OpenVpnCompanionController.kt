@@ -21,6 +21,7 @@ class OpenVpnCompanionController(
     @Volatile private var service: IOpenVPNAPIService? = null
     @Volatile var bound: Boolean = false
         private set
+    @Volatile private var bindingRequested: Boolean = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val statusCallback = object : IOpenVPNStatusCallback.Stub() {
@@ -59,13 +60,34 @@ class OpenVpnCompanionController(
             bound = false
             onStatus("DISCONNECTED", "OpenVPN engine service disconnected.", "ERROR")
         }
+
+        override fun onBindingDied(name: ComponentName?) {
+            service = null
+            bound = false
+            bindingRequested = false
+            onStatus("DISCONNECTED", "OpenVPN service binding died. Reopen the VPN screen to reconnect.", "ERROR")
+            runCatching { context.unbindService(this) }
+        }
+
+        override fun onNullBinding(name: ComponentName?) {
+            service = null
+            bound = false
+            bindingRequested = false
+            onStatus("API_ERROR", "OpenVPN service returned no control interface.", "ERROR")
+            runCatching { context.unbindService(this) }
+        }
     }
 
+    @Synchronized
     fun bind(): Boolean {
+        if (bindingRequested) return true
         val intent = Intent(IOpenVPNAPIService::class.java.name).setPackage(OPENVPN_PACKAGE)
-        return runCatching {
+        val accepted = runCatching {
             context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
         }.getOrDefault(false)
+        bindingRequested = accepted
+        if (!accepted) onStatus("NOT_INSTALLED", "OpenVPN control service could not be bound.", "ERROR")
+        return accepted
     }
 
     fun prepareApiAccess(): Intent? =
@@ -85,10 +107,12 @@ class OpenVpnCompanionController(
         requireNotNull(service) { "OpenVPN engine is not connected." }.disconnect()
     }
 
+    @Synchronized
     fun unbind() {
         val current = service
         if (current != null) runCatching { current.unregisterStatusCallback(statusCallback) }
-        if (bound) runCatching { context.unbindService(connection) }
+        if (bindingRequested) runCatching { context.unbindService(connection) }
+        bindingRequested = false
         service = null
         bound = false
     }
