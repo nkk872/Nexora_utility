@@ -374,6 +374,8 @@ private fun VaultPage(activity: Activity) {
     var unlocked by remember { mutableStateOf(false) }
     var exportingId by remember { mutableStateOf<String?>(null) }
     var documentPickerInProgress by remember { mutableStateOf(false) }
+    var renamingEntry by remember { mutableStateOf<VaultStore.Entry?>(null) }
+    var renameText by remember { mutableStateOf("") }
 
     DisposableEffect(activity) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -477,6 +479,25 @@ private fun VaultPage(activity: Activity) {
         return
     }
 
+    if (renamingEntry != null) {
+        AlertDialog(
+            onDismissRequest = { renamingEntry = null },
+            title = { Text("Rename vault file") },
+            text = { OutlinedTextField(value = renameText, onValueChange = { renameText = it.take(160) }, singleLine = true, label = { Text("File name") }) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val target = renamingEntry
+                    if (target != null) {
+                        runCatching { store.rename(target.id, renameText) }
+                            .onSuccess { entries = store.entries(); message = "Vault filename updated securely."; renamingEntry = null }
+                            .onFailure { message = "Could not rename this vault item." }
+                    }
+                }) { Text("Save", color = Accent) }
+            },
+            dismissButton = { TextButton(onClick = { renamingEntry = null }) { Text("Cancel") } }
+        )
+    }
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(20.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -499,6 +520,7 @@ private fun VaultPage(activity: Activity) {
                     Text(entry.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                     Text("${formatBytes(entry.encryptedBytes)} • ${entry.mimeType ?: "File"}", color = SecondaryText, fontSize = 11.sp)
                 }
+                TextButton(onClick = { renamingEntry = entry; renameText = entry.displayName }) { Text("Rename", color = Accent) }
                 TextButton(onClick = {
                     exportingId = entry.id
                     documentPickerInProgress = true
