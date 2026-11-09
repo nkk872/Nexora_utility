@@ -7,10 +7,14 @@ composeBom = "2024.12.01"
 wireguardTunnel = "1.0.20260102"
 desugarJdk = "2.0.3"
 biometric = "1.1.0"
+mobileAds = "25.5.0"
+ump = "4.0.0"
 
 [libraries]
 androidx-documentfile = { module = "androidx.documentfile:documentfile", version = "1.0.1" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
+google-mobile-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "mobileAds" }
+google-ump = { module = "com.google.android.ump:user-messaging-platform", version.ref = "ump" }
 wireguard-tunnel = { module = "com.wireguard.android:tunnel", version.ref = "wireguardTunnel" }
 desugar-jdk = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugarJdk" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
