@@ -30,10 +30,11 @@ Last updated: 2026-11-09.
 8. Ads, testing and release — no AdMob IDs or UMP consent integration configured; no successful build, lint, test, APK, AAB or device QA confirmed.
 
 ## Build verification
-- CI workflow is configured to compile Kotlin, run lint/unit tests, and assemble debug/release APKs.
-- GitHub connector currently exposes no workflow run for the latest direct pushes; combined commit status is empty. Therefore CI success is not confirmed.
-- Local build could not be run in this environment because GitHub/Gradle dependencies cannot be fetched.
-- Do not mark any release as build-ready until an actual successful CI build and device QA are observed.
+- Existing `.github/workflows/android-ci.yml` runs on `main` pushes, pull requests, and manual dispatch. It installs JDK 17 / Android SDK 35, provisions Gradle 8.9, generates the wrapper when absent, compiles Kotlin, runs lint and unit tests, and assembles debug plus unsigned release APKs as workflow artifacts.
+- Updated the workflow to `gradle/actions/setup-gradle@v6`.
+- A source commit has been pushed to trigger CI, but no successful workflow result or APK artifact has yet been observed. Build status remains unverified until GitHub Actions completes.
+- No local Android SDK / Gradle build was run in this environment.
+- Do not mark any release as build-ready until an actual successful CI build and physical-device QA are observed.
 
 ## Product / monetization rules
 - Free to use: no subscriptions, premium tier, credits, paid unlocks or in-app purchases.
