@@ -13,6 +13,24 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
+    val releaseKeystorePath = System.getenv("NEXORA_KEYSTORE_PATH")
+    val releaseStorePassword = System.getenv("NEXORA_KEYSTORE_PASSWORD")
+    val releaseKeyAlias = System.getenv("NEXORA_KEY_ALIAS")
+    val releaseKeyPassword = System.getenv("NEXORA_KEY_PASSWORD")
+    signingConfigs {
+        create("release") {
+            if (!releaseKeystorePath.isNullOrBlank() &&
+                !releaseStorePassword.isNullOrBlank() &&
+                !releaseKeyAlias.isNullOrBlank() &&
+                !releaseKeyPassword.isNullOrBlank()
+            ) {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
     buildFeatures {
         compose = true
         aidl = true
@@ -23,6 +41,17 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions { jvmTarget = "17" }
+    buildTypes {
+        getByName("release") {
+            if (!releaseKeystorePath.isNullOrBlank() &&
+                !releaseStorePassword.isNullOrBlank() &&
+                !releaseKeyAlias.isNullOrBlank() &&
+                !releaseKeyPassword.isNullOrBlank()
+            ) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
 }
 dependencies {
     implementation(libs.androidx.core.ktx)
