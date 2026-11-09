@@ -17,11 +17,14 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions { jvmTarget = "17" }
 }
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.wireguard.tunnel)
+    coreLibraryDesugaring(libs.desugar.jdk)
     implementation(libs.androidx.documentfile)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
