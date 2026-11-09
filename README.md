@@ -9,12 +9,13 @@ Native Android utility app built with Kotlin and Jetpack Compose.
 - User-selected large-file review, explicit delete confirmation and bounded exact SHA-256 duplicate grouping.
 - Encrypted private vault using Android Keystore AES-256-GCM with import/export; separate PIN/biometric gate is still pending.
 - Basic device diagnostics for Android version, available RAM, battery percentage and thermal status.
-- Built-in WireGuard VPN client using the official open-source tunnel engine; imports and encrypts user-provided `.conf` profiles, then starts/stops the tunnel with Android VPN consent. A reachable WireGuard server is required; Nexora does not provide VPN servers or exit locations.
+- Built-in WireGuard client for user-provided WireGuard server profiles.
+- Live VPN Gate country/server directory with encrypted OpenVPN profile storage. Nexora can request connect/disconnect and display status through the documented AIDL API of the separately installed OpenVPN for Android app; that companion app supplies the OpenVPN tunnel engine. VPN Gate relays are volunteer-operated and availability changes.
 - Shortcuts to Android system settings for app, network, display, battery and sound controls.
-- Minimal manifest and least-privilege baseline; no broad storage, overlay or accessibility permissions are requested. VPN network access is used only by the embedded WireGuard tunnel.
+- Minimal manifest and least-privilege baseline; no broad storage, overlay or accessibility permissions are requested. Network access is used for the VPN Gate directory and VPN client integrations.
 
 ## Product scope and release gates
-Planned next modules: broader media analysis, separate vault PIN/biometric gate, compliant app-management tools, game diagnostics and release QA. The WireGuard client requires a valid profile for a reachable server; Nexora does not yet operate its own VPN server fleet.
+Planned next modules: broader media analysis, separate vault PIN/biometric gate, compliant app-management tools, game diagnostics and release QA. WireGuard requires a valid user profile and reachable WireGuard server. VPN Gate OpenVPN connections require the separate OpenVPN for Android companion app; Nexora does not operate its own VPN server fleet. VPN Gate server availability, throughput and privacy are not guaranteed.
 
 Features are not described as active until implemented and tested. Android does not allow an ordinary third-party app to silently clear other apps' caches, hide arbitrary apps, or boost CPU/GPU performance. Nexora will use supported APIs and disclose these limitations.
 
