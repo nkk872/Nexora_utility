@@ -2,8 +2,6 @@ package com.nexora.utility
 
 import android.app.Activity
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.os.Environment
 import android.os.StatFs
@@ -13,8 +11,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
 import android.net.Uri
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -90,7 +86,7 @@ private fun NexoraApp(activity: Activity) {
                         })
                     Page.STORAGE -> StoragePage(activity)
                     Page.VAULT -> VaultPage(activity)
-                    Page.VPN -> VpnPage(activity)
+                    Page.VPN -> ProtonVpnPage(activity)
                     Page.TOOLS -> ToolsPage(activity) { notice = it }
                 }
             }
