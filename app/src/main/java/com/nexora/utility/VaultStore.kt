@@ -24,7 +24,7 @@ import javax.crypto.spec.GCMParameterSpec
  * Android Keystore. A vault item is only considered saved after the GCM tag verifies.
  */
 class VaultStore(private val context: Context) {
-    data class Entry(val id: String, val encryptedBytes: Long)
+    data class Entry(val id: String, val encryptedBytes: Long, val displayName: String = "Encrypted file", val mimeType: String? = null)
 
     private val directory: File
         get() = File(context.filesDir, "private_vault").apply { mkdirs() }
@@ -32,12 +32,14 @@ class VaultStore(private val context: Context) {
     fun entries(): List<Entry> = directory.listFiles()
         .orEmpty()
         .filter { it.isFile && it.extension == "nexora" }
-        .map { Entry(it.nameWithoutExtension, it.length()) }
-        .sortedBy { it.id }
+        .map { file -> val id = file.nameWithoutExtension; val meta = readMetadata(id); Entry(id, file.length(), meta.first ?: "Encrypted file", meta.second) }
+        .sortedBy { it.displayName.lowercase() }
 
     fun encrypt(uri: Uri): Entry {
         val id = UUID.randomUUID().toString()
         val target = File(directory, "$id.nexora")
+        val displayName = context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }?.take(160) ?: "Imported file"
+        val mimeType = context.contentResolver.getType(uri)
         val cipher = Cipher.getInstance(TRANSFORMATION).apply {
             init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         }
@@ -52,9 +54,11 @@ class VaultStore(private val context: Context) {
                     }
                 }
             } ?: error("Unable to open the selected file")
-            return Entry(id, target.length())
+            writeMetadata(id, displayName, mimeType)
+            return Entry(id, target.length(), displayName, mimeType)
         } catch (error: Exception) {
             target.delete()
+            File(directory, "$id.meta").delete()
             throw error
         }
     }
@@ -114,7 +118,38 @@ class VaultStore(private val context: Context) {
 
     fun delete(id: String): Boolean {
         require(id.matches(Regex("[a-f0-9-]{36}"))) { "Invalid vault item" }
-        return File(directory, "$id.nexora").delete()
+        val deleted = File(directory, "$id.nexora").delete()
+        File(directory, "$id.meta").delete()
+        return deleted
+    }
+
+    private fun writeMetadata(id: String, name: String, mime: String?) {
+        val cipher = Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.ENCRYPT_MODE, getOrCreateKey()) }
+        DataOutputStream(FileOutputStream(File(directory, "$id.meta"))).use { output ->
+            output.writeByte(cipher.iv.size)
+            output.write(cipher.iv)
+            val encrypted = cipher.doFinal((name + "\u0000" + (mime ?: "")).toByteArray(Charsets.UTF_8))
+            output.writeInt(encrypted.size)
+            output.write(encrypted)
+        }
+    }
+
+    private fun readMetadata(id: String): Pair<String?, String?> {
+        val source = File(directory, "$id.meta")
+        if (!source.isFile) return null to null
+        return runCatching {
+            DataInputStream(FileInputStream(source)).use { input ->
+                val ivLength = input.readUnsignedByte()
+                require(ivLength in 12..16)
+                val iv = ByteArray(ivLength).also(input::readFully)
+                val size = input.readInt()
+                require(size in 16..4096)
+                val encrypted = ByteArray(size).also(input::readFully)
+                val cipher = Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv)) }
+                val values = cipher.doFinal(encrypted).toString(Charsets.UTF_8).split('\u0000', limit = 2)
+                values[0].take(160) to values.getOrNull(1)?.takeIf { it.isNotBlank() }
+            }
+        }.getOrElse { null to null }
     }
 
     private fun getOrCreateKey(): SecretKey {
