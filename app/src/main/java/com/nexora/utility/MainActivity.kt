@@ -278,7 +278,7 @@ private fun StoragePage(activity: Activity) {
                     files = files.filterNot { deletedUris.contains(it.uri.toString()) }
                     selected = selected - deletedUris
                     scanMessage = "Deleted ${deletedUris.size} of ${targets.size} selected file(s). " +
-                        if (deletedUris.size == targets.size) "Selected files removed." else "Files that could not be be deleted remain listed."
+                        if (deletedUris.size == targets.size) "Selected files removed." else "Files that could not be deleted remain listed."
                     showDeleteConfirm = false
                 }) { Text("Delete", color = Color(0xFFFF7777)) }
             },
