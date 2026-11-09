@@ -82,15 +82,18 @@ private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
         secondary = SecondaryText
     )) {
         Scaffold(containerColor = Background, bottomBar = {
-            NavigationBar(containerColor = SurfaceDark) {
-                listOf(Page.HOME to "Home", Page.CLEANER to "Clean", Page.STORAGE to "Storage", Page.VAULT to "Vault", Page.VPN to "VPN", Page.TOOLS to "Tools").forEach { (target, label) ->
-                    NavigationBarItem(
-                        selected = page == target, onClick = { page = target },
-                        icon = { Text(when (target) { Page.HOME -> "⌂"; Page.CLEANER -> "✦"; Page.STORAGE -> "▤"; Page.VAULT -> "▣"; Page.VPN -> "⌁"; Page.TOOLS -> "⚙" }, fontSize = 20.sp) },
-                        label = { Text(label) },
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Accent, selectedTextColor = Accent, indicatorColor = Accent.copy(alpha = .12f), unselectedTextColor = SecondaryText)
-                    )
+            Column {
+                NavigationBar(containerColor = SurfaceDark) {
+                    listOf(Page.HOME to "Home", Page.CLEANER to "Clean", Page.STORAGE to "Storage", Page.VAULT to "Vault", Page.VPN to "VPN", Page.TOOLS to "Tools").forEach { (target, label) ->
+                        NavigationBarItem(
+                            selected = page == target, onClick = { page = target },
+                            icon = { Text(when (target) { Page.HOME -> "⌂"; Page.CLEANER -> "✦"; Page.STORAGE -> "▤"; Page.VAULT -> "▣"; Page.VPN -> "⌁"; Page.TOOLS -> "⚙" }, fontSize = 20.sp) },
+                            label = { Text(label) },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = Accent, selectedTextColor = Accent, indicatorColor = Accent.copy(alpha = .12f), unselectedTextColor = SecondaryText)
+                        )
+                    }
                 }
+                if (adsAllowed && page != Page.VAULT) AnchoredBannerAd()
             }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
