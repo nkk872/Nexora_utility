@@ -316,10 +316,11 @@ private fun VaultPage(activity: Activity) {
     var message by remember { mutableStateOf("Unlock with your device biometric or screen-lock credential to access your encrypted vault.") }
     var unlocked by remember { mutableStateOf(false) }
     var exportingId by remember { mutableStateOf<String?>(null) }
+    var documentPickerInProgress by remember { mutableStateOf(false) }
 
     DisposableEffect(activity) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && !documentPickerInProgress) {
                 unlocked = false
                 entries = emptyList()
                 exportingId = null
@@ -335,6 +336,7 @@ private fun VaultPage(activity: Activity) {
     val authAvailability = biometricManager.canAuthenticate(authenticators)
 
     val importPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        documentPickerInProgress = false
         if (uri != null && unlocked) {
             runCatching { store.encrypt(uri) }
                 .onSuccess {
@@ -345,6 +347,7 @@ private fun VaultPage(activity: Activity) {
         }
     }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        documentPickerInProgress = false
         val id = exportingId
         if (uri != null && id != null && unlocked) {
             val result = runCatching {
@@ -427,7 +430,7 @@ private fun VaultPage(activity: Activity) {
                     TextButton(onClick = { unlocked = false; message = "Vault locked." }) { Text("Lock", color = Accent) }
                 }
                 Text("AES-256-GCM encryption with a non-exportable Android Keystore key. Vault access also requires device authentication.", color = SecondaryText, fontSize = 12.sp)
-                Button(onClick = { importPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) { Text("Add file to vault") }
+                Button(onClick = { documentPickerInProgress = true; importPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) { Text("Add file to vault") }
                 Text(message, color = SecondaryText, fontSize = 12.sp)
             }
         }
@@ -440,6 +443,7 @@ private fun VaultPage(activity: Activity) {
                 }
                 TextButton(onClick = {
                     exportingId = entry.id
+                    documentPickerInProgress = true
                     exportPicker.launch("nexora-export-${entry.id.take(8)}.bin")
                 }) { Text("Export") }
                 TextButton(onClick = {
