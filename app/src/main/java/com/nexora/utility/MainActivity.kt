@@ -351,6 +351,57 @@ private fun NexoraVpnPage(activity: Activity) {
     var savedProfileId by remember { mutableStateOf(preferences.getString("vpngate_profile_id", null)) }
     var showWireGuard by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("Loading live volunteer VPN relays…") }
+    var engineStatus by remember { mutableStateOf("CHECKING") }
+    var engineMessage by remember { mutableStateOf("Checking OpenVPN for Android engine…") }
+    var pendingConfig by remember { mutableStateOf<String?>(null) }
+
+    val controller = remember(context) {
+        OpenVpnCompanionController(context) { state, detail, _ ->
+            engineStatus = state
+            engineMessage = detail
+        }
+    }
+    DisposableEffect(controller) {
+        val bound = controller.bind()
+        if (!bound) {
+            engineStatus = "NOT_INSTALLED"
+            engineMessage = "OpenVPN for Android is not installed or its control service is unavailable."
+        }
+        onDispose { controller.unbind() }
+    }
+
+    val apiPermissionLauncher = rememberLauncherForActivityResult(StartActivityForResult()) { result ->
+        val config = pendingConfig
+        if (result.resultCode == RESULT_OK && config != null) {
+            runCatching { controller.start(config) }
+                .onSuccess { message = "Connection request sent. Waiting for OpenVPN tunnel status…" }
+                .onFailure { message = "Could not start OpenVPN: " + (it.message ?: "Unknown error") }
+        } else {
+            message = "OpenVPN control permission was not granted."
+        }
+    }
+
+    val connectSelected: (VpnGateServer) -> Unit = { server ->
+        runCatching {
+            val profile = VpnGateRepository.decodeOpenVpnProfile(server)
+            val entry = vault.encryptBytes(profile.toByteArray(Charsets.UTF_8))
+            preferences.edit().putString("vpngate_profile_id", entry.id).apply()
+            savedProfileId = entry.id
+            require(engineStatus == "READY" || engineStatus == "CONNECTED" || engineStatus == "NOPROCESS") {
+                "Install OpenVPN for Android and wait for its engine to become ready."
+            }
+            pendingConfig = profile
+            val permissionIntent = controller.prepareApiAccess()
+            if (permissionIntent != null) {
+                apiPermissionLauncher.launch(permissionIntent)
+            } else {
+                controller.start(profile)
+                message = "Connection request sent. Waiting for OpenVPN tunnel status…"
+            }
+        }.onFailure {
+            message = it.message ?: "Could not prepare the OpenVPN connection."
+        }
+    }
 
     val loadServers: () -> Unit = {
         if (!loading) {
@@ -402,11 +453,25 @@ private fun NexoraVpnPage(activity: Activity) {
                 Text("NEXORA VPN • VPN GATE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                 Text("Explore free VPN locations", fontSize = 23.sp, fontWeight = FontWeight.Bold)
                 Text("Live directory of volunteer-operated OpenVPN relays. Countries and servers appear only when the provider currently lists them.", color = SecondaryText, fontSize = 12.sp)
+                Text("OpenVPN engine: $engineStatus", color = if (engineStatus == "CONNECTED") Accent else SecondaryText, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                Text(engineMessage, color = SecondaryText, fontSize = 11.sp)
+                if (engineStatus == "NOT_INSTALLED") {
+                    Button(onClick = {
+                        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(OpenVpnCompanionController.PLAY_STORE_URL)))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Install OpenVPN for Android") }
+                }
                 Text(message, color = SecondaryText, fontSize = 12.sp)
                 TextButton(onClick = { showWireGuard = true }) { Text("Use my WireGuard profile instead", color = Accent) }
                 Button(onClick = loadServers, enabled = !loading, modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
                     Text(if (loading) "Refreshing…" else "Refresh server list")
+                }
+                if (engineStatus == "CONNECTED" || engineStatus == "CONNECTING") {
+                    OutlinedButton(onClick = {
+                        runCatching { controller.disconnect() }
+                            .onSuccess { message = "Disconnect request sent." }
+                            .onFailure { message = it.message ?: "Could not disconnect." }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Disconnect OpenVPN") }
                 }
             }
         }
@@ -425,6 +490,7 @@ private fun NexoraVpnPage(activity: Activity) {
             item { Text("No matching servers. Try another country or refresh the list.", color = SecondaryText) }
         }
         items(filtered, key = { it.hostName + it.ip }) { server ->
+            val isSelected = selected?.hostName == server.hostName
             Column(
                 Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(16.dp)).padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -437,46 +503,47 @@ private fun NexoraVpnPage(activity: Activity) {
                     Text(server.countryShort, color = Accent, fontWeight = FontWeight.Bold)
                 }
                 Text("Ping ${server.pingMs} ms  •  ${server.speedMbps} Mbps  •  ${server.sessions} sessions", color = SecondaryText, fontSize = 12.sp)
-                Text(if (selected?.hostName == server.hostName) "Selected" else "OpenVPN profile available", color = if (selected?.hostName == server.hostName) Accent else SecondaryText, fontSize = 11.sp)
                 Button(
                     onClick = {
                         selected = server
-                        message = "${server.countryLong} selected. You can securely save its OpenVPN profile on this device."
+                        message = "${server.countryLong} selected."
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (selected?.hostName == server.hostName) Accent else Color(0xFF25352D), contentColor = if (selected?.hostName == server.hostName) Background else Color.White)
-                ) { Text(if (selected?.hostName == server.hostName) "Selected server" else "Select location") }
-                if (selected?.hostName == server.hostName) {
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isSelected) Accent else Color(0xFF25352D), contentColor = if (isSelected) Background else Color.White)
+                ) { Text(if (isSelected) "Selected location" else "Select location") }
+                if (isSelected) {
                     Button(
+                        onClick = { connectSelected(server) },
+                        enabled = engineStatus == "READY" || engineStatus == "CONNECTED" || engineStatus == "NOPROCESS",
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)
+                    ) { Text("Connect to ${server.countryLong}") }
+                    OutlinedButton(
                         onClick = {
                             runCatching {
                                 val profile = VpnGateRepository.decodeOpenVpnProfile(server)
                                 val entry = vault.encryptBytes(profile.toByteArray(Charsets.UTF_8))
                                 preferences.edit().putString("vpngate_profile_id", entry.id).apply()
                                 savedProfileId = entry.id
-                                message = "OpenVPN profile encrypted and saved in Nexora Vault. Connection engine integration is still pending."
-                            }.onFailure {
-                                message = "Could not save this server profile securely."
-                            }
+                                message = "OpenVPN profile encrypted and saved in Nexora Vault."
+                            }.onFailure { message = it.message ?: "Could not securely save this profile." }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25352D), contentColor = Color.White)
-                    ) { Text("Save OpenVPN profile securely") }
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Save profile only") }
                 }
             }
         }
         if (savedProfileId != null) {
-            item { Text("An OpenVPN profile is encrypted in Nexora Vault on this device. It is not connected yet.", color = Accent, fontSize = 12.sp) }
+            item { Text("A VPN profile is encrypted in Nexora Vault on this device.", color = Accent, fontSize = 12.sp) }
         }
         item {
             Text(
-                "Important safety note: these are public volunteer relays, not a managed commercial VPN. Operators may observe connection metadata and traffic that is not protected by HTTPS. Availability, speed and privacy are not guaranteed. Avoid banking or sensitive activity on these servers.",
+                "OpenVPN tunnel engine is provided by the separately installed OpenVPN for Android app; Nexora controls it through its documented remote API. Public VPN Gate relays are volunteer-run, may be unreliable, and are not suitable for banking or sensitive activity.",
                 color = SecondaryText, fontSize = 12.sp
             )
         }
     }
 }
-
 
 @Composable
 private fun WireGuardProfilePage(activity: Activity, onBack: () -> Unit) {
