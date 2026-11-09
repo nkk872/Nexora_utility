@@ -834,6 +834,17 @@ private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
     activity.getSystemService(android.app.ActivityManager::class.java)?.getMemoryInfo(memoryInfo)
     val batteryPercent = activity.getSystemService(android.os.BatteryManager::class.java)
         ?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+    val batteryIntent = activity.registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    val batteryTemperature = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
+    val batteryHealth = when (batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_HEALTH, -1)) {
+        android.os.BatteryManager.BATTERY_HEALTH_GOOD -> "Good"
+        android.os.BatteryManager.BATTERY_HEALTH_OVERHEAT -> "Overheating"
+        android.os.BatteryManager.BATTERY_HEALTH_COLD -> "Cold"
+        android.os.BatteryManager.BATTERY_HEALTH_DEAD -> "Battery fault"
+        android.os.BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "Over voltage"
+        else -> "Unknown"
+    }
+    val plugged = (batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("DEVICE DIAGNOSTICS", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
         Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -844,6 +855,14 @@ private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
                 MetricCard("Available RAM", if (memoryInfo.availMem > 0) formatBytes(memoryInfo.availMem) else "Unavailable", Modifier.weight(1f))
                 MetricCard("Battery", if (batteryPercent in 0..100) "$batteryPercent%" else "Unavailable", Modifier.weight(1f))
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                MetricCard("Battery health", batteryHealth, Modifier.weight(1f))
+                MetricCard("Power", if (plugged) "Charging / plugged" else "On battery", Modifier.weight(1f))
+            }
+            Text(
+                "Battery temperature: " + if (batteryTemperature >= 0) String.format(Locale.US, "%.1f °C", batteryTemperature / 10.0) else "Unavailable",
+                color = SecondaryText, fontSize = 12.sp
+            )
             if (android.os.Build.VERSION.SDK_INT >= 29) {
                 val thermal = activity.getSystemService(android.os.PowerManager::class.java)?.currentThermalStatus
                 Text("Thermal status: ${when (thermal) { 0 -> "None"; 1 -> "Light"; 2 -> "Moderate"; 3 -> "Severe"; 4 -> "Critical"; 5 -> "Emergency"; 6 -> "Shutdown"; else -> "Unavailable" }}", color = SecondaryText, fontSize = 12.sp)
