@@ -27,6 +27,8 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.biometric)
+    implementation(libs.google.mobile.ads)
+    implementation(libs.google.ump)
     implementation(libs.wireguard.tunnel)
     coreLibraryDesugaring(libs.desugar.jdk)
     implementation(libs.androidx.documentfile)
