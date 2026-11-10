@@ -750,6 +750,17 @@ private fun VaultPage(activity: Activity) {
 private fun NexoraVpnPage(activity: Activity) {
     val context = LocalContext.current
     var refreshTick by remember { mutableIntStateOf(0) }
+    var showOtherVpnOptions by remember { mutableStateOf(false) }
+    var showWireGuard by remember { mutableStateOf(false) }
+
+    if (showWireGuard) {
+        WireGuardProfilePage(activity, onBack = { showWireGuard = false })
+        return
+    }
+    if (showOtherVpnOptions) {
+        LegacyVpnGatePage(activity, onBack = { showOtherVpnOptions = false })
+        return
+    }
 
     // Refresh package/network observations while this screen is visible.
     LaunchedEffect(Unit) {
@@ -846,6 +857,14 @@ private fun NexoraVpnPage(activity: Activity) {
             }
         }
         item {
+            TextButton(onClick = { showOtherVpnOptions = true }) {
+                Text("Other VPN option: volunteer relays (experimental)", color = Accent)
+            }
+            TextButton(onClick = { showWireGuard = true }) {
+                Text("Use my own WireGuard profile", color = Accent)
+            }
+        }
+        item {
             Text("How this integration works", color = Accent, fontWeight = FontWeight.SemiBold)
             Text(
                 "Nexora opens the official RiseupVPN app for connection and disconnection. RiseupVPN manages its own tunnel and permissions. Nexora does not collect your VPN credentials, generate fake server profiles, or claim a connection it cannot verify.",
@@ -858,6 +877,240 @@ private fun NexoraVpnPage(activity: Activity) {
                 "Android normally allows only one active VPN service at a time. Disconnect another VPN before starting RiseupVPN. For sensitive activity, review the provider's own security information and connection status.",
                 color = SecondaryText,
                 fontSize = 12.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun LegacyVpnGatePage(activity: Activity, onBack: () -> Unit) {
+    var servers by remember { mutableStateOf<List<VpnGateServer>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf<VpnGateServer?>(null) }
+    val context = LocalContext.current
+    var networkDiagnosticsRefresh by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(5_000)
+            networkDiagnosticsRefresh++
+        }
+    }
+    val networkDiagnosticsTick = networkDiagnosticsRefresh
+    val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+    val activeNetwork = connectivityManager?.activeNetwork
+    val networkCapabilities = activeNetwork?.let { network -> connectivityManager?.getNetworkCapabilities(network) }
+    val vpnTransportDetected = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+    val internetValidated = networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+    val underlyingNetwork = when {
+        vpnTransportDetected -> "VPN tunnel"
+        networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "Wi-Fi"
+        networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Mobile data"
+        networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet"
+        networkCapabilities == null -> "Unavailable"
+        else -> "Other"
+    }
+    val vault = remember { VaultStore(context) }
+    val preferences = remember { context.getSharedPreferences("nexora_vpn", 0) }
+    var savedProfileId by remember { mutableStateOf(preferences.getString("vpngate_profile_id", null)) }
+    var showWireGuard by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("Loading live volunteer VPN relays…") }
+    var engineStatus by remember { mutableStateOf("CHECKING") }
+    var engineMessage by remember { mutableStateOf("Checking OpenVPN for Android engine…") }
+    var pendingConfig by remember { mutableStateOf<String?>(null) }
+
+    val controller = remember(context) {
+        OpenVpnCompanionController(context) { state, detail, _ ->
+            engineStatus = state
+            engineMessage = detail
+        }
+    }
+    DisposableEffect(controller) {
+        val bound = controller.bind()
+        if (!bound) {
+            engineStatus = "NOT_INSTALLED"
+            engineMessage = "OpenVPN for Android is not installed or its control service is unavailable."
+        }
+        onDispose { controller.unbind() }
+    }
+
+    val apiPermissionLauncher = rememberLauncherForActivityResult(StartActivityForResult()) { result ->
+        val config = pendingConfig
+        if (result.resultCode == RESULT_OK && config != null) {
+            runCatching { controller.start(config) }
+                .onSuccess { message = "Connection request sent. Waiting for OpenVPN tunnel status…" }
+                .onFailure { message = "Could not start OpenVPN: " + (it.message ?: "Unknown error") }
+        } else {
+            message = "OpenVPN control permission was not granted."
+        }
+    }
+
+    val connectSelected: (VpnGateServer) -> Unit = { server ->
+        runCatching {
+            val profile = VpnGateRepository.decodeOpenVpnProfile(server)
+            val entry = vault.encryptBytes(profile.toByteArray(Charsets.UTF_8))
+            preferences.edit().putString("vpngate_profile_id", entry.id).apply()
+            savedProfileId = entry.id
+            require(engineStatus == "READY" || engineStatus == "CONNECTED" || engineStatus == "NOPROCESS") {
+                "Install OpenVPN for Android and wait for its engine to become ready."
+            }
+            pendingConfig = profile
+            val permissionIntent = controller.prepareApiAccess()
+            if (permissionIntent != null) {
+                apiPermissionLauncher.launch(permissionIntent)
+            } else {
+                controller.start(profile)
+                message = "Connection request sent. Waiting for OpenVPN tunnel status…"
+            }
+        }.onFailure {
+            message = it.message ?: "Could not prepare the OpenVPN connection."
+        }
+    }
+
+    val loadServers: () -> Unit = {
+        if (!loading) {
+            loading = true
+            message = "Refreshing VPN Gate server directory…"
+            Thread {
+                val result = runCatching { VpnGateRepository.fetchServers() }
+                activity.runOnUiThread {
+                    loading = false
+                    result.onSuccess { list ->
+                        servers = list
+                        message = if (list.isEmpty()) "No OpenVPN relays were returned. Try refreshing later."
+                            else "Updated live directory: ${list.size} OpenVPN profiles found."
+                    }.onFailure {
+                        message = "Could not load the live directory. Check your internet connection and try again."
+                    }
+                }
+            }.start()
+        }
+    }
+
+    if (showWireGuard) {
+        WireGuardProfilePage(activity, onBack = { showWireGuard = false })
+        return
+    }
+
+    LaunchedEffect(Unit) { loadServers() }
+
+    val filtered = remember(servers, query) {
+        val matching = if (query.isBlank()) servers else servers.filter {
+            it.countryLong.contains(query, ignoreCase = true) ||
+                it.countryShort.contains(query, ignoreCase = true) ||
+                it.ip.contains(query, ignoreCase = true) ||
+                it.hostName.contains(query, ignoreCase = true)
+        }
+        matching.sortedBy { it.pingMs }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        item {
+            TextButton(onClick = onBack) { Text("Back to RiseupVPN", color = Accent) }
+        }
+        item {
+            Column(
+                Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Text("PRIVATE CONNECTION", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Text("Choose your VPN route", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Live directory of volunteer-operated OpenVPN relays. Countries and servers appear only when the provider currently lists them.", color = SecondaryText, fontSize = 12.sp)
+                Text("OpenVPN engine: $engineStatus", color = if (engineStatus == "CONNECTED") Accent else SecondaryText, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                Text(engineMessage, color = SecondaryText, fontSize = 11.sp)
+                Text("Android VPN transport: " + if (vpnTransportDetected) "Detected" else "Not detected", color = if (vpnTransportDetected) Accent else SecondaryText, fontSize = 12.sp)
+                Text("Internet connectivity: " + if (internetValidated) "Validated" else "Not validated", color = if (internetValidated) Accent else SecondaryText, fontSize = 12.sp)
+                Text("Active network: $underlyingNetwork · diagnostics refresh every 5 seconds", color = SecondaryText, fontSize = 11.sp)
+                Text("These checks report Android network state; they do not certify VPN leak protection or endpoint trust.", color = SecondaryText, fontSize = 10.sp)
+                if (engineStatus == "NOT_INSTALLED") {
+                    Button(onClick = {
+                        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(OpenVpnCompanionController.PLAY_STORE_URL)))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Install OpenVPN for Android") }
+                }
+                Text(message, color = SecondaryText, fontSize = 12.sp)
+                TextButton(onClick = { showWireGuard = true }) { Text("Use my WireGuard profile instead", color = Accent) }
+                Button(onClick = loadServers, enabled = !loading, modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
+                    Text(if (loading) "Refreshing…" else "Refresh server list")
+                }
+                if (engineStatus == "CONNECTED" || engineStatus == "CONNECTING") {
+                    OutlinedButton(onClick = {
+                        runCatching { controller.disconnect() }
+                            .onSuccess { message = "Disconnect request sent." }
+                            .onFailure { message = it.message ?: "Could not disconnect." }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Disconnect OpenVPN") }
+                }
+            }
+        }
+        item {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Search country or server") },
+                placeholder = { Text("e.g. Japan, India, 1.2.3.4") }
+            )
+            Text("${filtered.size} servers • ${servers.map { it.countryShort }.distinct().size} countries", color = SecondaryText, fontSize = 12.sp)
+        }
+        if (filtered.isEmpty() && !loading) {
+            item { Text("No matching servers. Try another country or refresh the list.", color = SecondaryText) }
+        }
+        items(filtered, key = { it.hostName + it.ip }) { server ->
+            val isSelected = selected?.hostName == server.hostName
+            Column(
+                Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(16.dp)).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(server.countryLong, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Text("${server.hostName} • ${server.ip}", color = SecondaryText, fontSize = 11.sp)
+                    }
+                    Text(server.countryShort, color = Accent, fontWeight = FontWeight.Bold)
+                }
+                Text("Ping ${server.pingMs} ms  •  ${server.speedMbps} Mbps  •  ${server.sessions} sessions", color = SecondaryText, fontSize = 12.sp)
+                Button(
+                    onClick = {
+                        selected = server
+                        message = "${server.countryLong} selected."
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isSelected) Accent else Color(0xFF25352D), contentColor = if (isSelected) Background else Color.White)
+                ) { Text(if (isSelected) "Selected location" else "Select location") }
+                if (isSelected) {
+                    Button(
+                        onClick = { connectSelected(server) },
+                        enabled = engineStatus == "READY" || engineStatus == "CONNECTED" || engineStatus == "NOPROCESS",
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)
+                    ) { Text("Connect to ${server.countryLong}") }
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                val profile = VpnGateRepository.decodeOpenVpnProfile(server)
+                                val entry = vault.encryptBytes(profile.toByteArray(Charsets.UTF_8))
+                                preferences.edit().putString("vpngate_profile_id", entry.id).apply()
+                                savedProfileId = entry.id
+                                message = "OpenVPN profile encrypted and saved in Nexora Vault."
+                            }.onFailure { message = it.message ?: "Could not securely save this profile." }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Save profile only") }
+                }
+            }
+        }
+        if (savedProfileId != null) {
+            item { Text("A VPN profile is encrypted in Nexora Vault on this device.", color = Accent, fontSize = 12.sp) }
+        }
+        item {
+            Text(
+                "OpenVPN tunnel engine is provided by the separately installed OpenVPN for Android app; Nexora controls it through its documented remote API. Public VPN Gate relays are volunteer-run, may be unreliable, and are not suitable for banking or sensitive activity.",
+                color = SecondaryText, fontSize = 12.sp
             )
         }
     }
