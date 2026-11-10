@@ -73,19 +73,19 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
           yes | sdkmanager --licenses
+          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: '8.9'
+          gradle-version: '8.11.1'
 
       - name: Generate wrapper if repository does not include one
         shell: bash
         run: |
           if [ ! -f gradlew ]; then
-            gradle wrapper --gradle-version 8.9 --distribution-type bin
+            gradle wrapper --gradle-version 8.11.1 --distribution-type bin
           fi
           chmod +x gradlew
 
@@ -127,10 +127,10 @@ jobs:
           NEXORA_ADMOB_BANNER_ID: ${{ secrets.NEXORA_ADMOB_BANNER_ID }}
         run: ./gradlew --no-daemon --stacktrace :app:bundleRelease
 
-      - name: Upload APK outputs
+      - name: Upload APK and AAB outputs
         uses: actions/upload-artifact@v4
         with:
-          name: nexora-utility-apks
+          name: nexora-utility-apks-and-aab
           path: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
