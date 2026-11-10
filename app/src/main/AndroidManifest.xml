@@ -14,5 +14,6 @@
     </application>
     <queries>
         <package android:name="de.blinkt.openvpn" />
+        <package android:name="se.leap.riseupvpn" />
     </queries>
 </manifest>

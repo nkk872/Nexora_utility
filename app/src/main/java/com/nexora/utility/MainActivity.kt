@@ -748,6 +748,142 @@ private fun VaultPage(activity: Activity) {
 
 @Composable
 private fun NexoraVpnPage(activity: Activity) {
+    val context = LocalContext.current
+    var refreshTick by remember { mutableIntStateOf(0) }
+    var showOtherVpnOptions by remember { mutableStateOf(false) }
+    var showWireGuard by remember { mutableStateOf(false) }
+
+    if (showWireGuard) {
+        WireGuardProfilePage(activity, onBack = { showWireGuard = false })
+        return
+    }
+    if (showOtherVpnOptions) {
+        LegacyVpnGatePage(activity, onBack = { showOtherVpnOptions = false })
+        return
+    }
+
+    // Refresh package/network observations while this screen is visible.
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(5_000)
+            refreshTick++
+        }
+    }
+
+    val packageManager = context.packageManager
+    val riseupLaunchIntent = remember(refreshTick) {
+        packageManager.getLaunchIntentForPackage("se.leap.riseupvpn")
+    }
+    val riseupInstalled = riseupLaunchIntent != null
+
+    val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+    val activeNetwork = remember(refreshTick) { connectivityManager?.activeNetwork }
+    val capabilities = remember(refreshTick, activeNetwork) {
+        activeNetwork?.let { connectivityManager?.getNetworkCapabilities(it) }
+    }
+    val vpnTransportDetected = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+    val internetValidated = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        item {
+            Column(
+                Modifier.fillMaxWidth()
+                    .background(SurfaceDark, RoundedCornerShape(22.dp))
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("PRIVACY PROVIDER", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Text("RiseupVPN", fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "Free, donation-funded VPN from the Riseup collective. Its Android app is open source and does not require an account.",
+                    color = SecondaryText,
+                    fontSize = 13.sp
+                )
+                Text(
+                    if (riseupInstalled) "RiseupVPN app detected on this device." else "RiseupVPN app is not installed yet.",
+                    color = if (riseupInstalled) Accent else SecondaryText,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp
+                )
+                Button(
+                    onClick = {
+                        val launch = packageManager.getLaunchIntentForPackage("se.leap.riseupvpn")
+                        if (launch != null) {
+                            activity.startActivity(launch)
+                        } else {
+                            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://help.riseup.net/en/vpn/android")))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)
+                ) {
+                    Text(if (riseupInstalled) "Open RiseupVPN" else "Get RiseupVPN installation guide")
+                }
+                OutlinedButton(
+                    onClick = {
+                        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://f-droid.org/packages/se.leap.riseupvpn/")))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("View RiseupVPN on F-Droid") }
+            }
+        }
+        item {
+            Column(
+                Modifier.fillMaxWidth()
+                    .background(SurfaceDark, RoundedCornerShape(18.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("ANDROID NETWORK STATUS", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(
+                    if (vpnTransportDetected) "VPN transport detected" else "No active VPN transport detected",
+                    color = if (vpnTransportDetected) Accent else SecondaryText,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    if (internetValidated) "Internet connection validated" else "Internet connection not validated",
+                    color = SecondaryText,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Android reports whether a VPN transport is active, but it does not identify the VPN provider to Nexora. This status does not prove that RiseupVPN is connected or that traffic is leak-free.",
+                    color = SecondaryText,
+                    fontSize = 11.sp
+                )
+            }
+        }
+        item {
+            TextButton(onClick = { showOtherVpnOptions = true }) {
+                Text("Other VPN option: volunteer relays (experimental)", color = Accent)
+            }
+            TextButton(onClick = { showWireGuard = true }) {
+                Text("Use my own WireGuard profile", color = Accent)
+            }
+        }
+        item {
+            Text("How this integration works", color = Accent, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Nexora opens the official RiseupVPN app for connection and disconnection. RiseupVPN manages its own tunnel and permissions. Nexora does not collect your VPN credentials, generate fake server profiles, or claim a connection it cannot verify.",
+                color = SecondaryText,
+                fontSize = 12.sp
+            )
+        }
+        item {
+            Text(
+                "Android normally allows only one active VPN service at a time. Disconnect another VPN before starting RiseupVPN. For sensitive activity, review the provider's own security information and connection status.",
+                color = SecondaryText,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun LegacyVpnGatePage(activity: Activity, onBack: () -> Unit) {
     var servers by remember { mutableStateOf<List<VpnGateServer>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -873,6 +1009,9 @@ private fun NexoraVpnPage(activity: Activity) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
+        item {
+            TextButton(onClick = onBack) { Text("Back to RiseupVPN", color = Accent) }
+        }
         item {
             Column(
                 Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(16.dp),
