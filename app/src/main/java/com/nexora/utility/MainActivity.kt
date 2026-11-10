@@ -753,6 +753,26 @@ private fun NexoraVpnPage(activity: Activity) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<VpnGateServer?>(null) }
     val context = LocalContext.current
+    var networkDiagnosticsRefresh by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(5_000)
+            networkDiagnosticsRefresh++
+        }
+    }
+    val networkDiagnosticsTick = networkDiagnosticsRefresh
+    val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+    val activeNetwork = connectivityManager?.activeNetwork
+    val networkCapabilities = activeNetwork?.let { connectivityManager.getNetworkCapabilities(it) }
+    val vpnTransportDetected = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+    val internetValidated = networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+    val underlyingNetwork = when {
+        networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "Wi-Fi"
+        networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Mobile data"
+        networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet"
+        networkCapabilities == null -> "Unavailable"
+        else -> "Other"
+    }
     val vault = remember { VaultStore(context) }
     val preferences = remember { context.getSharedPreferences("nexora_vpn", 0) }
     var savedProfileId by remember { mutableStateOf(preferences.getString("vpngate_profile_id", null)) }
@@ -862,6 +882,10 @@ private fun NexoraVpnPage(activity: Activity) {
                 Text("Live directory of volunteer-operated OpenVPN relays. Countries and servers appear only when the provider currently lists them.", color = SecondaryText, fontSize = 12.sp)
                 Text("OpenVPN engine: $engineStatus", color = if (engineStatus == "CONNECTED") Accent else SecondaryText, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 Text(engineMessage, color = SecondaryText, fontSize = 11.sp)
+                Text("Android VPN transport: " + if (vpnTransportDetected) "Detected" else "Not detected", color = if (vpnTransportDetected) Accent else SecondaryText, fontSize = 12.sp)
+                Text("Internet connectivity: " + if (internetValidated) "Validated" else "Not validated", color = if (internetValidated) Accent else SecondaryText, fontSize = 12.sp)
+                Text("Network: $underlyingNetwork · diagnostics refresh every 5 seconds", color = SecondaryText, fontSize = 11.sp)
+                Text("These checks report Android network state; they do not certify VPN leak protection or endpoint trust.", color = SecondaryText, fontSize = 10.sp)
                 if (engineStatus == "NOT_INSTALLED") {
                     Button(onClick = {
                         activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(OpenVpnCompanionController.PLAY_STORE_URL)))
@@ -1059,6 +1083,12 @@ private object WireGuardRuntime {
 @Composable
 private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
     var diagnosticsRefresh by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            diagnosticsRefresh++
+        }
+    }
     val refreshTick = diagnosticsRefresh
     val memoryInfo = android.app.ActivityManager.MemoryInfo()
     activity.getSystemService(android.app.ActivityManager::class.java)?.getMemoryInfo(memoryInfo)
