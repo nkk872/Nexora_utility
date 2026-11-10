@@ -767,6 +767,7 @@ private fun NexoraVpnPage(activity: Activity) {
     val vpnTransportDetected = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
     val internetValidated = networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     val underlyingNetwork = when {
+        vpnTransportDetected -> "VPN tunnel"
         networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "Wi-Fi"
         networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Mobile data"
         networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet"
@@ -884,7 +885,7 @@ private fun NexoraVpnPage(activity: Activity) {
                 Text(engineMessage, color = SecondaryText, fontSize = 11.sp)
                 Text("Android VPN transport: " + if (vpnTransportDetected) "Detected" else "Not detected", color = if (vpnTransportDetected) Accent else SecondaryText, fontSize = 12.sp)
                 Text("Internet connectivity: " + if (internetValidated) "Validated" else "Not validated", color = if (internetValidated) Accent else SecondaryText, fontSize = 12.sp)
-                Text("Network: $underlyingNetwork · diagnostics refresh every 5 seconds", color = SecondaryText, fontSize = 11.sp)
+                Text("Active network: $underlyingNetwork · diagnostics refresh every 5 seconds", color = SecondaryText, fontSize = 11.sp)
                 Text("These checks report Android network state; they do not certify VPN leak protection or endpoint trust.", color = SecondaryText, fontSize = 10.sp)
                 if (engineStatus == "NOT_INSTALLED") {
                     Button(onClick = {
