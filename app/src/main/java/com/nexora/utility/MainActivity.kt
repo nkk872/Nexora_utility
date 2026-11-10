@@ -763,7 +763,7 @@ private fun NexoraVpnPage(activity: Activity) {
     val networkDiagnosticsTick = networkDiagnosticsRefresh
     val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
     val activeNetwork = connectivityManager?.activeNetwork
-    val networkCapabilities = activeNetwork?.let { connectivityManager.getNetworkCapabilities(it) }
+    val networkCapabilities = activeNetwork?.let { network -> connectivityManager?.getNetworkCapabilities(network) }
     val vpnTransportDetected = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
     val internetValidated = networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     val underlyingNetwork = when {
