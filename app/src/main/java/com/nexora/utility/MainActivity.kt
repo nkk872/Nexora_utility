@@ -1166,6 +1166,29 @@ private fun ToolsPage(activity: Activity, report: (String) -> Unit) {
         else -> if (plugged) "Connected" else "On battery"
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("TOOLS HUB", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            QuickAction("App manager", "▦", Modifier.weight(1f)) {
+                launchSetting(activity, Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS), report)
+            }
+            QuickAction("Wi-Fi tools", "⌁", Modifier.weight(1f)) {
+                launchSetting(activity, Intent(Settings.ACTION_WIFI_SETTINGS), report)
+            }
+            QuickAction("Battery", "ϟ", Modifier.weight(1f)) {
+                launchSetting(activity, Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS), report)
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            QuickAction("Game tools", "🎮", Modifier.weight(1f)) {
+                launchSetting(activity, Intent("android.settings.GAME_SETTINGS"), report)
+            }
+            QuickAction("Display", "☼", Modifier.weight(1f)) {
+                launchSetting(activity, Intent(Settings.ACTION_DISPLAY_SETTINGS), report)
+            }
+            QuickAction("Storage", "▤", Modifier.weight(1f)) {
+                launchSetting(activity, Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS), report)
+            }
+        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("DEVICE DIAGNOSTICS", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
             TextButton(onClick = { diagnosticsRefresh++ }) { Text("Refresh", color = Accent) }
