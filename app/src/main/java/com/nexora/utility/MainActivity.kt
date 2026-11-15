@@ -26,10 +26,12 @@ import java.io.File
 import java.io.FileInputStream
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,7 +93,7 @@ private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
                     modifier = Modifier.fillMaxWidth().height(62.dp).background(SurfaceDark),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    listOf(Page.HOME to "Home", Page.CLEANER to "Clean", Page.STORAGE to "Storage", Page.VAULT to "Vault", Page.VPN to "VPN", Page.TOOLS to "Tools").forEach { (target, label) ->
+                    listOf(Page.HOME to "Home", Page.CLEANER to "Scan", Page.TOOLS to "Tools", Page.VAULT to "Vault", Page.VPN to "VPN").forEach { (target, label) ->
                         val selected = page == target
                         Column(
                             modifier = Modifier.weight(1f).fillMaxHeight().clickable { page = target }.padding(vertical = 5.dp),
@@ -125,7 +127,7 @@ private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
                     Text("●", color = Accent, fontSize = 20.sp)
                 }
                 when (page) {
-                    Page.HOME -> HomePage(cacheSize, notice) { page = it }
+                    Page.HOME -> HomePage(activity, cacheSize, notice) { page = it }
                     Page.CLEANER -> CleanerPage(activity, cacheSize, notice,
                         refresh = { cacheSize = it },
                         clean = { freed -> cacheSize = readCacheSize(activity); notice = "Removed " + formatBytes(freed) + " of cleaner temporary files." })
@@ -140,43 +142,92 @@ private fun NexoraApp(activity: Activity, adsAllowed: Boolean) {
 }
 
 @Composable
-private fun HomePage(cacheSize: Long, notice: String, open: (Page) -> Unit) {
+private fun HomePage(activity: Activity, cacheSize: Long, notice: String, open: (Page) -> Unit) {
+    val storage = StatFs(Environment.getDataDirectory().path)
+    val totalStorage = storage.totalBytes.coerceAtLeast(1L)
+    val freeStorage = storage.availableBytes.coerceAtLeast(0L)
+    val usedStorage = (totalStorage - freeStorage).coerceAtLeast(0L)
+    val usedPercent = ((usedStorage.toDouble() / totalStorage.toDouble()) * 100).toInt().coerceIn(0, 100)
+    val battery = activity.getSystemService(android.os.BatteryManager::class.java)
+        ?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Column(
+                Modifier.fillMaxWidth().background(
+                    brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF092B1D), Color(0xFF101B16), Color(0xFF10251B))),
+                    shape = RoundedCornerShape(26.dp)
+                ).border(1.dp, Accent.copy(alpha = .35f), RoundedCornerShape(26.dp)).padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("DEVICE CARE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                        Text("Your phone, in better shape.", fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 27.sp)
-                        Text("A clear view of storage, privacy and device health.", color = SecondaryText, fontSize = 13.sp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("NEXORA  /  DEVICE CARE", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.8.sp)
+                        Text("Your device,\nunder control.", fontSize = 25.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold)
+                        Text("Clean • Secure • Optimize", color = SecondaryText, fontSize = 12.sp)
                     }
                     Box(
-                        Modifier.size(66.dp).background(Accent.copy(alpha = .12f), RoundedCornerShape(22.dp)),
+                        Modifier.size(116.dp).border(3.dp, Accent.copy(alpha = .35f), CircleShape).padding(8.dp)
+                            .border(2.dp, Accent, CircleShape).background(Color(0xFF0C2117), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("✦", color = Accent, fontSize = 34.sp)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("✦", color = Accent, fontSize = 28.sp)
+                            Text("READY", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        }
                     }
                 }
                 Button(
-                    onClick = { open(Page.CLEANER) },
-                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { open(Page.CLEANER) }, modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background),
-                    contentPadding = PaddingValues(vertical = 10.dp)
-                ) { Text("Scan & optimize", fontWeight = FontWeight.SemiBold) }
+                    contentPadding = PaddingValues(vertical = 13.dp), shape = RoundedCornerShape(18.dp)
+                ) { Text("⌕   SMART SCAN", fontWeight = FontWeight.Bold, letterSpacing = .5.sp) }
                 Text(notice, color = Accent, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MetricCard("App cache", formatBytes(cacheSize), Modifier.weight(1f))
-            MetricCard("Cleaner", "Ready to scan", Modifier.weight(1f))
-        } }
-        item { FeatureRow("Smart cleaner", "Review and clear Nexora's temporary cache", "✦") { open(Page.CLEANER) } }
-        item { FeatureRow("Storage analyzer", "See device storage capacity and free space", "▤") { open(Page.STORAGE) } }
-        item { FeatureRow("Device tools", "Open Android's built-in device settings", "⚙") { open(Page.TOOLS) } }
         item {
-            Text("Privacy first", color = Accent, fontWeight = FontWeight.SemiBold)
-            Text("Nexora never silently deletes personal photos, videos, downloads or other apps' data.", color = SecondaryText, fontSize = 13.sp)
+            Text("DEVICE OVERVIEW", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.7.sp)
+            Column(Modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(22.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Storage used", color = SecondaryText, fontSize = 12.sp)
+                        Text("${formatBytes(usedStorage)} / ${formatBytes(totalStorage)}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text("$usedPercent%", color = Accent, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                }
+                LinearProgressIndicator(progress = { usedPercent / 100f }, modifier = Modifier.fillMaxWidth().height(7.dp), color = Accent, trackColor = Color(0xFF29352F))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MetricCard("App cleaner cache", formatBytes(cacheSize), Modifier.weight(1f))
+                    MetricCard("Battery", if (battery in 0..100) "$battery%" else "Unavailable", Modifier.weight(1f))
+                }
+            }
         }
+        item { Text("QUICK ACCESS", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.7.sp) }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                QuickAction("Storage", "▤", Modifier.weight(1f)) { open(Page.STORAGE) }
+                QuickAction("Device tools", "⚙", Modifier.weight(1f)) { open(Page.TOOLS) }
+                QuickAction("Private vault", "▣", Modifier.weight(1f)) { open(Page.VAULT) }
+            }
+        }
+        item { FeatureRow("VPN & network", "Check VPN status and network diagnostics", "⌁") { open(Page.VPN) } }
+        item {
+            Column(Modifier.fillMaxWidth().background(Color(0xFF10251B), RoundedCornerShape(18.dp)).border(1.dp, Accent.copy(alpha = .22f), RoundedCornerShape(18.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("PRIVACY BY DESIGN", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("Nexora only cleans files it owns. Personal photos, downloads and other apps' data are never silently deleted.", color = SecondaryText, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAction(title: String, glyph: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.fillMaxWidth().background(SurfaceDark, RoundedCornerShape(18.dp))
+            .border(1.dp, Color(0xFF263A30), RoundedCornerShape(18.dp)).clickable(onClick = onClick).padding(vertical = 16.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(glyph, color = Accent, fontSize = 25.sp)
+        Text(title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
